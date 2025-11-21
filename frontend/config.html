@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Paramétrage des variables</title>
+    <link rel="stylesheet" href="style-dashboard.css">
+
+    <script>
+        if (localStorage.getItem("loggedIn") !== "true") {
+            window.location.href = "login.html";
+        }
+    </script>
+</head>
+
+<body class="dash-body">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <span class="sidebar-logo-icon">🧰</span>
+        <span class="sidebar-logo-text">SUPERVISION</span>
+    </div>
+
+    <nav class="sidebar-menu">
+        <a href="index.html" class="sidebar-item">📊 <span>Temps réel</span></a>
+        <a href="config.html" class="sidebar-item active">⚙️ <span>Paramétrage</span></a>
+        <a href="historique.html" class="sidebar-item">📅 <span>Historique</span></a>
+    </nav>
+
+    <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
+</aside>
+
+<!-- Main zone -->
+<div class="main-layout">
+
+<header class="topbar">
+    <div>
+        <h1>Paramétrage des variables</h1>
+        <p>Ajoute, modifie ou supprime des variables à superviser</p>
+    </div>
+    <div class="topbar-clock">
+        <span id="clock-time">--:--</span>
+        <span id="clock-date">--/--/----</span>
+    </div>
+</header>
+
+<main class="config-container">
+
+    <!-- Table des variables -->
+    <section class="card config-card">
+        <h2>Liste des variables</h2>
+
+        <table class="vars-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>IP automate</th>
+                    <th>Registre</th>
+                    <th>Fréquence (s)</th>
+                    <th>Actif</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody id="config-body">
+                <!-- Exemple en attendant le backend -->
+                <tr>
+                    <td>Température four</td>
+                    <td>192.168.0.10</td>
+                    <td>40001</td>
+                    <td>5</td>
+                    <td><span class="pill ok">ON</span></td>
+                    <td>
+                        <button class="btn-small edit-btn">Modifier</button>
+                        <button class="btn-small delete-btn">Supprimer</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Pression ligne</td>
+                    <td>192.168.0.11</td>
+                    <td>30002</td>
+                    <td>2</td>
+                    <td><span class="pill ok">ON</span></td>
+                    <td>
+                        <button class="btn-small edit-btn">Modifier</button>
+                        <button class="btn-small delete-btn">Supprimer</button>
+                    </td>
+                </tr>
+
+            </tbody>
+        </table>
+
+        <div class="config-footer">
+            <button class="btn-add" onclick="openForm()">➕ Ajouter une variable</button>
+        </div>
+    </section>
+
+    <!-- Formulaire d'ajout / modification -->
+    <section class="card form-card" id="form-card" style="display:none;">
+        <h2 id="form-title">Ajouter une variable</h2>
+
+        <label>Nom de la variable</label>
+        <input type="text" id="var-nom">
+
+        <label>IP automate</label>
+        <input type="text" id="var-ip">
+
+        <label>Registre / Adresse</label>
+        <input type="text" id="var-registre">
+
+        <label>Fréquence (sec)</label>
+        <input type="number" id="var-freq">
+
+        <label>Actif</label>
+        <select id="var-actif">
+            <option value="1">Oui</option>
+            <option value="0">Non</option>
+        </select>
+
+        <div class="form-buttons">
+            <button class="btn-save">💾 Enregistrer</button>
+            <button class="btn-cancel" onclick="closeForm()">Annuler</button>
+        </div>
+    </section>
+
+</main>
+
+</div>
+
+<script>
+function logout() {
+    localStorage.removeItem("loggedIn");
+    window.location.href = "login.html";
+}
+
+function updateClock() {
+    const now = new Date();
+    document.getElementById("clock-time").textContent = now.toLocaleTimeString();
+    document.getElementById("clock-date").textContent = now.toLocaleDateString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Formulaire
+function openForm() {
+    document.getElementById("form-card").style.display = "flex";
+}
+function closeForm() {
+    document.getElementById("form-card").style.display = "none";
+}
+</script>
+
+</body>
+</html>

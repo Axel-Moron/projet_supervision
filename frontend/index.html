@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Supervision – Variables process</title>
+    <link rel="stylesheet" href="style-dashboard.css">
+
+    <!-- Protection login -->
+    <script>
+        if (localStorage.getItem("loggedIn") !== "true") {
+            window.location.href = "login.html";
+        }
+    </script>
+</head>
+
+<body class="dash-body">
+
+    <!-- Sidebar gauche -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="sidebar-logo-icon">🧰</span>
+            <span class="sidebar-logo-text">SUPERVISION</span>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="index.html" class="sidebar-item active">📊 <span>Temps réel</span></a>
+            <a href="config.html" class="sidebar-item">⚙️ <span>Paramétrage</span></a>
+            <a href="historique.html" class="sidebar-item">📅 <span>Historique</span></a>
+            <a href="#" class="sidebar-item">🚨 <span>Alarmes</span></a>
+        </nav>
+
+        <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
+    </aside>
+
+    <!-- Zone principale -->
+    <div class="main-layout">
+
+        <!-- Bandeau haut -->
+        <header class="topbar">
+            <div>
+                <h1>Supervision des variables process</h1>
+                <p>TP – Déploiement d’un SI (Node / MariaDB / Docker)</p>
+            </div>
+            <div class="topbar-right">
+                <div class="topbar-badges">
+                    <span class="badge badge-ok">Backend OK</span>
+                    <span class="badge badge-ok">MariaDB OK</span>
+                    <span class="badge badge-warn">Modbus simulé</span>
+                </div>
+                <div class="topbar-clock">
+                    <span id="clock-time">--:--</span>
+                    <span id="clock-date">--/--/----</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Grille principale adaptée au TP -->
+        <main class="grid grid-tp">
+
+            <!-- Liste des variables -->
+            <section class="card vars-card">
+                <h2>Variables surveillées</h2>
+                
+                <table class="vars-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>IP automate</th>
+                            <th>Registre</th>
+                            <th>Fréq. (s)</th>
+                            <th>Dernière valeur</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vars-body">
+                        <!-- Exemple de lignes (remplacées plus tard par le backend) -->
+                        <tr class="row-selected">
+                            <td>Température four</td>
+                            <td>192.168.0.10</td>
+                            <td>40001</td>
+                            <td>5</td>
+                            <td>182.4 °C</td>
+                            <td><span class="pill ok">OK</span></td>
+                        </tr>
+                        <tr>
+                            <td>Pression ligne</td>
+                            <td>192.168.0.11</td>
+                            <td>30002</td>
+                            <td>2</td>
+                            <td>6.2 bar</td>
+                            <td><span class="pill warn">SEUIL</span></td>
+                        </tr>
+                        <tr>
+                            <td>Moteur convoyeur</td>
+                            <td>192.168.0.12</td>
+                            <td>00013</td>
+                            <td>1</td>
+                            <td>ON</td>
+                            <td><span class="pill err">FAULT</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="vars-footer">
+                    <button class="btn-link" onclick="window.location.href='config.html'">
+                        ⚙️ Gérer les variables
+                    </button>
+                </div>
+            </section>
+
+            <!-- Graph temps réel -->
+            <section class="card realtime-card">
+                <div class="realtime-header">
+                    <div>
+                        <h2>Temps réel – <span id="rt-var-name">Température four</span></h2>
+                        <p>Dernières 2 minutes (rafraîchissement périodique côté backend)</p>
+                    </div>
+                    <div class="rt-current">
+                        <span class="label">Dernière valeur</span>
+                        <span class="rt-value" id="rt-value">182.4 °C</span>
+                        <span class="rt-timestamp" id="rt-timestamp">à 16:29:12</span>
+                    </div>
+                </div>
+
+                <div class="trend-placeholder">
+                    <!-- Tu pourras remplacer ce div par un <canvas id="rtChart"></canvas> pour Chart.js -->
+                    <span>Graphique temps réel (Chart.js ici)</span>
+                </div>
+            </section>
+
+            <!-- Cartes de synthèse -->
+            <section class="card summary-card">
+                <h2>Résumé supervision</h2>
+
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span class="label">Variables actives</span>
+                        <span class="value big" id="sum-active">3</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Variables en seuil</span>
+                        <span class="value big warn" id="sum-warn">1</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Variables en défaut</span>
+                        <span class="value big err" id="sum-err">1</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="label">Total mesures / h</span>
+                        <span class="value big" id="sum-rate">720</span>
+                    </div>
+                </div>
+
+                <div class="summary-footer">
+                    <button class="btn-link" onclick="window.location.href='historique.html'">
+                        📅 Voir historique & export CSV
+                    </button>
+                </div>
+            </section>
+
+        </main>
+
+    </div>
+
+<script>
+function logout() {
+    localStorage.removeItem("loggedIn");
+    window.location.href = "login.html";
+}
+
+// Horloge
+function updateClock() {
+    const now = new Date();
+    const t = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const d = now.toLocaleDateString('fr-FR');
+    document.getElementById('clock-time').textContent = t;
+    document.getElementById('clock-date').textContent = d;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Plus tard tu viendras ici ajouter des fetch() vers ton backend :
+// - GET /api/variables pour remplir le tableau
+// - GET /api/mesures/latest?variable_id=... pour rt-value
+// - GET /api/mesures/history?... pour Chart.js
+</script>
+
+</body>
+</html>
