@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -60,3 +61,67 @@ function showMessage(msg) {
 
 </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="style-login.css">
+</head>
+
+<body class="login-body">
+
+<div class="login-card">
+
+    <div class="top-banner">
+        <!-- TON LOGO DANS LE BANDEAU -->
+        <img src="Images_Icones/user_bleu_vide.png" class="banner-logo" alt="Logo">
+    </div>
+
+    <h2 class="connexion">Connexion</h2>
+
+    <!-- Identifiant -->
+    <div class="input-group">
+        <span class="icon">👤</span>
+        <input type="text" id="username" placeholder="Identifiant">
+    </div>
+
+    <!-- Mot de passe -->
+    <div class="input-group">
+        <span class="icon">🔒</span>
+        <input type="password" id="password" placeholder="Mot de passe">
+    </div>
+
+    <!-- Bouton -->
+    <button class="submit-btn" id="loginBtn">Se connecter</button>
+
+    <!-- Message d’erreur -->
+    <p id="loginMessage"></p>
+
+</div>
+
+<script>
+document.getElementById("loginBtn").addEventListener("click", () => {
+    const user = document.getElementById("username").value;
+    const pass = document.getElementById("password").value;
+
+    if (user === "admin" && pass === "1234") {
+        localStorage.setItem("loggedIn", "true");
+        window.location.href = "index.html";
+    } else {
+        showMessage("Identifiants incorrects");
+    }
+});
+
+
+function showMessage(msg) {
+    const m = document.getElementById("loginMessage");
+    m.textContent = msg;
+    m.style.color = "red";
+}
+</script>
+
+</body>
+</html>
+>>>>>>> remote-main
