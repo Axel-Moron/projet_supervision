@@ -18,8 +18,10 @@ import authRoutes from "./routes/auth.js";
 const app = express();
 
 // --- VARIABLE GLOBALE D'ÉTAT ---
-let MODE_SIMULATION = true; // Par défaut on simule
+let MODE_SIMULATION = false; // Par défaut on simule pas
 
+// Fonction pour faire une pause
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // ... (Configuration BDD autoConfigDB identique, je ne la remets pas pour raccourcir, garde la tienne) ...
 // ... Si tu as besoin je peux la remettre, mais c'est la fonction autoConfigDB() d'avant ...
 // Pour faire simple, copie-colle la fonction autoConfigDB() de ton ancien fichier ici.
@@ -73,33 +75,47 @@ const lireModbusReel = async (variables) => {
     for (const v of variables) {
         const client = new ModbusRTU();
         try {
-            // 1. Connexion à l'automate (Timeout 2s)
+            // console.log(`🔌 Connexion à ${v.ip_automate}...`);
+            
+            // On ajoute un timeout de connexion pour ne pas bloquer
             await client.connectTCP(v.ip_automate, { port: 502 });
             client.setID(1);
             client.setTimeout(2000);
 
-            // 2. Lecture (On suppose que le registre est un Holding Register)
-            // Note: souvent 40001 = adresse 0 ou 1 selon les automates. Ici on prend brut.
             const addr = parseInt(v.registre); 
             const data = await client.readHoldingRegisters(addr, 1);
             
-            let val = data.data[0]; // Valeur brute
+            let val = data.data[0];
 
-            // Si c'est un booléen mais qu'on reçoit un mot, on convertit
             if (v.type === "boolean") {
                 val = val > 0 ? 1 : 0;
             } else {
-                // Exemple simple de mise à l'échelle (à adapter selon tes besoins)
-                // Souvent les automates envoient des entiers x10 ou x100
-                val = val / 10; 
+                val = val / 100; 
             }
 
+            console.log(`✅ Succès ${v.nom} : ${val}`);
             await Mesure.create({ variable_id: v.id, valeur: val, timestamp: now });
 
         } catch (error) {
-            console.error(`❌ Erreur Modbus sur ${v.ip_automate} :`, error.message);
+            // On filtre les erreurs pour ne pas polluer la console si c'est juste un timeout
+            if(error.code !== 'ETIMEDOUT') {
+                console.error(`❌ Erreur Modbus sur ${v.ip_automate} :`, error.message);
+            }
+            
+            await Mesure.create({ 
+                variable_id: v.id, 
+                valeur: -1, 
+                timestamp: now 
+            });
+
         } finally {
-            client.close();
+            // Fermeture propre
+            try { await client.close(); } catch(e) {}
+            
+            // --- C'EST ICI QUE LA MAGIE OPÈRE ---
+            // On attend 500ms avant de passer à la variable suivante
+            // pour ne pas spammer l'automate et éviter le ECONNRESET
+            await sleep(500); 
         }
     }
 };

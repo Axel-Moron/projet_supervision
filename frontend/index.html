@@ -10,43 +10,45 @@
             window.location.href = "login.html";
         }
     </script>
-</head>
-<style>
-    /* Style du Switch */
-    .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    
-    /* Par défaut (Non coché = MODE RÉEL) -> On met du VERT */
-    .slider { 
-        position: absolute; cursor: pointer; 
-        top: 0; left: 0; right: 0; bottom: 0; 
-        background-color: #2ecc71; /* VERT pour le mode Réel */
-        -webkit-transition: .4s; transition: .4s; 
-        border-radius: 34px; 
-    }
-    
-    .slider:before { 
-        position: absolute; content: ""; 
-        height: 14px; width: 14px; 
-        left: 2px; bottom: 2px; 
-        background-color: white; 
-        -webkit-transition: .4s; transition: .4s; 
-        border-radius: 50%; 
-    }
 
-    /* Quand on coche (MODE SIMULATION) -> On met du ROUGE */
-    input:checked + .slider { 
-        background-color: #ff4b4b; /* ROUGE demandé */
-    } 
-    
-    input:focus + .slider { box-shadow: 0 0 1px #ff4b4b; }
-    
-    input:checked + .slider:before { 
-        -webkit-transform: translateX(16px); 
-        -ms-transform: translateX(16px); 
-        transform: translateX(16px); 
-    }
-</style>
+    <style>
+        /* Conteneur du Switch */
+        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        
+        /* Par défaut (Non coché = MODE RÉEL) -> VERT */
+        .slider { 
+            position: absolute; cursor: pointer; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background-color: #2ecc71; /* Vert */
+            -webkit-transition: .4s; transition: .4s; 
+            border-radius: 34px; 
+        }
+        
+        .slider:before { 
+            position: absolute; content: ""; 
+            height: 14px; width: 14px; 
+            left: 2px; bottom: 2px; 
+            background-color: white; 
+            -webkit-transition: .4s; transition: .4s; 
+            border-radius: 50%; 
+        }
+
+        /* Quand on coche (MODE SIMULATION) -> ROUGE */
+        input:checked + .slider { 
+            background-color: #ff4b4b; /* Rouge */
+        } 
+        
+        input:focus + .slider { box-shadow: 0 0 1px #ff4b4b; }
+        
+        input:checked + .slider:before { 
+            -webkit-transform: translateX(16px); 
+            -ms-transform: translateX(16px); 
+            transform: translateX(16px); 
+        }
+    </style>
+</head>
+
 <body class="dash-body">
 
     <aside class="sidebar">
@@ -71,19 +73,21 @@
                 <h1>Supervision des variables process</h1>
                 <p>TP – Déploiement d’un SI (Node / MariaDB / Docker)</p>
             </div>
+            
             <div class="topbar-right">
                 <div class="topbar-badges" style="display: flex; align-items: center; gap: 10px;">
                     <span class="badge badge-ok">Backend OK</span>
                     <span class="badge badge-ok">MariaDB OK</span>
                     
                     <div style="display:flex; align-items:center; background:#0b172d; padding:2px 8px; border-radius:15px; border:1px solid #1c2844;">
-                        <span id="mode-label" style="font-size:10px; margin-right:8px; color:#9aa7c7;">SIMULATION</span>
+                        <span id="mode-label" style="font-size:10px; margin-right:8px; color:#2ecc71;">MODBUS RÉEL</span>
                         <label class="switch">
-                            <input type="checkbox" id="mode-switch" checked onchange="toggleMode()">
+                            <input type="checkbox" id="mode-switch" onchange="toggleMode()">
                             <span class="slider round"></span>
                         </label>
                     </div>
                 </div>
+
                 <div class="topbar-clock">
                     <span id="clock-time">--:--</span>
                     <span id="clock-date">--/--/----</span>
@@ -173,7 +177,7 @@
 <script>
     const API_URL = "http://localhost:3000/api";
 
-    // 1. Mise à jour de l'horloge
+    // 1. Horloge
     function updateClock() {
         const now = new Date();
         document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
@@ -182,49 +186,88 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // 2. Boucle de rafraîchissement des données (Toutes les 2 secondes)
-    setInterval(updateDashboard, 2000);
-    updateDashboard(); // Premier appel immédiat
+    // 2. Gestion du Switch Mode (Simu / Réel)
+    async function toggleMode() {
+        const isSimu = document.getElementById("mode-switch").checked;
+        updateSwitchVisuals(isSimu);
 
+        // Envoyer au backend
+        try {
+            await fetch(`${API_URL}/mode`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ simulation: isSimu })
+            });
+        } catch(e) { console.error("Erreur switch mode", e); }
+    }
+
+    function updateSwitchVisuals(isSimu) {
+        const label = document.getElementById("mode-label");
+        if(isSimu) {
+            label.textContent = "SIMULATION";
+            label.style.color = "#ff4b4b"; // Rouge
+        } else {
+            label.textContent = "MODBUS RÉEL";
+            label.style.color = "#2ecc71"; // Vert
+        }
+    }
+
+    // 3. Boucle principale (Rafraîchissement Dashboard + Synchro Mode)
     async function updateDashboard() {
         try {
+            // A. Synchro du mode (Vérifier si le serveur a redémarré)
+            const resMode = await fetch(`${API_URL}/mode`);
+            const dataMode = await resMode.json();
+            
+            const checkbox = document.getElementById("mode-switch");
+            // Si l'état du serveur diffère du bouton, on corrige le bouton
+            if (checkbox.checked !== dataMode.mode) {
+                checkbox.checked = dataMode.mode;
+                updateSwitchVisuals(dataMode.mode);
+            }
+
+            // B. Récupération des données
             const response = await fetch(`${API_URL}/dashboard`);
             if(!response.ok) throw new Error("Erreur réseau");
             
             const data = await response.json();
             const tbody = document.getElementById("vars-body");
-            tbody.innerHTML = ""; // On vide le tableau pour le reremplir
+            tbody.innerHTML = ""; 
 
-            // Compteurs pour les KPIs
             let activeCount = 0;
-            let warnCount = 0; // Seuil dépassé
-            let errCount = 0;  // Erreur ou panne
+            let warnCount = 0;
+            let errCount = 0;
 
             data.forEach(item => {
                 activeCount++;
                 
-                // --- LOGIQUE D'AFFICHAGE (TOR vs ANALOGIQUE) ---
+                // Logique d'affichage
                 let displayValue = item.valeur;
                 let statusClass = "ok";
                 let statusText = "OK";
 
-                // Si c'est un booléen (Type défini ou valeur 0/1 stricte)
-                if (item.type === "boolean" || (item.valeur == 0 || item.valeur == 1 && item.valeur % 1 == 0)) {
+                // Gestion des erreurs de connexion Modbus (-1)
+                if (item.valeur === -1) {
+                    displayValue = "ERREUR COM";
+                    statusClass = "err";
+                    statusText = "TIMEOUT";
+                    errCount++;
+                }
+                // Gestion TOR (Booléen)
+                else if (item.type === "boolean" || (item.valeur == 0 || item.valeur == 1 && item.valeur % 1 == 0)) {
                     if (item.valeur == 1) {
                         displayValue = "MARCHE";
                         statusClass = "ok";
                     } else {
                         displayValue = "ARRÊT";
-                        statusClass = "warn"; // Orange pour arrêt
+                        statusClass = "warn";
                         statusText = "STOP";
                     }
                 } 
-                // Sinon c'est une valeur numérique (Température, Pression...)
+                // Gestion Analogique
                 else {
                     let val = parseFloat(item.valeur);
-                    displayValue = val.toFixed(2); // Pas d'unité en dur ici, on laisse le nombre pur
-                    
-                    // Exemple de règle métier : Si > 80, c'est une alerte
+                    displayValue = val.toFixed(2);
                     if(val > 80) {
                         statusClass = "err";
                         statusText = "ALERTE";
@@ -232,7 +275,7 @@
                     }
                 }
 
-                // Création de la ligne HTML
+                // Création ligne tableau
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td>${item.nom}</td>
@@ -243,26 +286,22 @@
                     <td><span class="pill ${statusClass}">${statusText}</span></td>
                 `;
                 
-                // Clic pour afficher le détail à droite
                 tr.onclick = () => updateDetail(item, displayValue);
-                
-                // Ajout au tableau
                 tbody.appendChild(tr);
             });
 
-            // Mise à jour des KPIs (Résumé)
+            // KPIs
             document.getElementById("sum-active").textContent = activeCount;
             document.getElementById("sum-warn").textContent = warnCount;
             document.getElementById("sum-err").textContent = errCount;
-            // Estimation simple du débit de données
-            document.getElementById("sum-rate").textContent = activeCount * (60/5) * 60; // Environ
+            document.getElementById("sum-rate").textContent = activeCount * (60/5) * 60; 
 
         } catch (e) {
-            console.error("Erreur connexion backend:", e);
+            console.error("Erreur dashboard:", e);
         }
     }
 
-    // 3. Mise à jour de la carte "Temps réel" (Détail)
+    // Mise à jour Détails
     function updateDetail(item, displayValue) {
         document.getElementById("rt-var-name").textContent = item.nom;
         document.getElementById("rt-value").textContent = displayValue;
@@ -275,53 +314,22 @@
         }
     }
 
-    // 4. Fonction de déconnexion
+    // Déconnexion
     async function logout() {
         try {
             await fetch("http://localhost:3000/api/auth/logout", { 
                 method: "POST",
                 credentials: "include"
             });
-        } catch(e) { console.error(e); }
-        
+        } catch(e) {}
         localStorage.removeItem("loggedIn");
         window.location.href = "login.html";
     }
-    // Gestion du mode (Simu / Réel)
-    async function toggleMode() {
-        const isSimu = document.getElementById("mode-switch").checked;
-        const label = document.getElementById("mode-label");
-        
-        // Mettre à jour l'interface immédiatement
-        if(isSimu) {
-            label.textContent = "SIMULATION";
-            label.style.color = "#ff4b4b"; // ROUGE
-        } else {
-            label.textContent = "MODBUS RÉEL";
-            label.style.color = "#2ecc71"; // VERT
-        }
 
-        // ... suite du code (fetch) inchangée ...
-    }
+    // Lancer la boucle
+    setInterval(updateDashboard, 2000);
+    updateDashboard(); // Immédiat
 
-    // Au chargement, vérifier l'état actuel
-    (async () => {
-        try {
-            const res = await fetch(`${API_URL}/mode`);
-            const data = await res.json();
-            const checkbox = document.getElementById("mode-switch");
-            checkbox.checked = data.mode;
-            
-            // Déclencher visuellement
-            if(data.mode) {
-                document.getElementById("mode-label").textContent = "SIMULATION";
-                document.getElementById("mode-label").style.color = "#ff4b4b"; // ROUGE
-            } else {
-                document.getElementById("mode-label").textContent = "MODBUS RÉEL";
-                document.getElementById("mode-label").style.color = "#2ecc71"; // VERT
-            }
-        } catch(e) {}
-    })();
 </script>
 
 </body>
