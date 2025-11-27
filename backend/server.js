@@ -1,107 +1,75 @@
-/**
- * Serveur Express pour l'application de contrôle qualité
- * Gère l'API REST pour la traçabilité des cartes électroniques
- */
-
-// Charger les variables d'environnement depuis le fichier .env
 import 'dotenv/config';
-
 import express from "express";
-import sequelize from "./config/db.js";
-import "./models/Operateur.js";
-import "./models/Piece.js";
-import Test from "./models/Test.js";
-import "./models/Resultat.js";
-
-import pieceRoutes from "./routes/pieces.js";
-import operateurRoutes from "./routes/operateur.js";
-import resultatsRoutes from "./routes/resultats.js";
-import testsRoutes from "./routes/tests.js";
-import authRoutes from "./routes/auth.js";
 import cors from "cors";
 import session from "express-session";
+import sequelize from "./config/db.js";
+
+// Modèles
+import Variable from "./models/Variable.js";
+import Mesure from "./models/Mesure.js";
+import User from "./models/User.js";
+
+// Routes
+import apiRoutes from "./routes/api.js";
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 
-// Configuration CORS avec credentials pour permettre les requêtes depuis le frontend
+// 1. Configuration CORS (Important pour que le login marche !)
 app.use(cors({
-  origin: true, // Permet toutes les origines (ou spécifiez votre frontend)
-  credentials: true
+    origin: true, // Accepte toutes les origines (pour le dév)
+    credentials: true // Autorise l'envoi des cookies/sessions
 }));
 
-// Middleware pour parser les requêtes JSON
 app.use(express.json());
 
-// Configuration des sessions pour l'authentification des opérateurs
+// 2. Configuration des Sessions
 app.use(session({
-  secret: "controle-qualite-secret-key-2024",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // true en production avec HTTPS
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 heures
-  }
+    secret: "secret_supervision_key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // false car on est en HTTP (pas HTTPS)
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24h
+    }
 }));
 
-// Routes d'authentification (publiques - pas de middleware d'auth requis)
+// Routes
+app.use("/api", apiRoutes);
 app.use("/api/auth", authRoutes);
 
-// Routes protégées nécessitant une authentification
-app.use("/api/pieces", pieceRoutes);
-app.use("/api/operateur", operateurRoutes);
-app.use("/api/resultats", resultatsRoutes);
-app.use("/api/tests", testsRoutes);
-
-// Synchronisation de la base de données avec les modèles Sequelize
-await sequelize.sync({ alter: false });
-
-/**
- * Initialise les tests prédéfinis dans la base de données
- * Crée les 3 tests de base si aucun test n'existe déjà
- */
-async function seedTests() {
-  try {
-    const existingTests = await Test.findAll();
-    
-    if (existingTests.length === 0) {
-      console.log("📋 Initialisation des 3 tests prédéfinis...");
-      
-      // Test de connectivité (boolean: conforme/non conforme)
-      await Test.create({
-        nom_test: "Connectivité des circuits",
-        type_test: "boolean",
-        seuil_min: null,
-        seuil_max: null
-      });
-      
-      // Test thermique (numeric: température entre 0 et 80°C)
-      await Test.create({
-        nom_test: "Fonctionnement thermique",
-        type_test: "numeric",
-        seuil_min: 0,
-        seuil_max: 80
-      });
-      
-      // Test firmware (checkbox: conforme si coché)
-      await Test.create({
-        nom_test: "Mise à jour du firmware",
-        type_test: "checkbox",
-        seuil_min: null,
-        seuil_max: null
-      });
-      
-      console.log("✅ 3 tests créés avec succès !");
-    } else {
-      console.log(`ℹ️  ${existingTests.length} test(s) déjà présent(s) dans la base de données.`);
+// --- SIMULATION MODBUS ---
+const simulerAutomates = async () => {
+    try {
+        const variables = await Variable.findAll({ where: { actif: true } });
+        const now = new Date();
+        variables.forEach(async (v) => {
+            let randomValue = (Math.random() * 100).toFixed(2);
+            await Mesure.create({
+                variable_id: v.id,
+                valeur: randomValue,
+                timestamp: now
+            });
+        });
+        // console.log(`[SIMULATION] Données générées.`);
+    } catch (error) {
+        console.error("Erreur simulation:", error);
     }
-  } catch (error) {
-    console.error("❌ Erreur lors du seed des tests:", error);
-  }
+};
+setInterval(simulerAutomates, 5000);
+
+// --- DÉMARRAGE ET SEEDING ---
+await sequelize.sync({ force: false });
+
+// Création de l'admin par défaut s'il n'existe pas
+const adminExists = await User.findOne({ where: { username: "admin" } });
+if (!adminExists) {
+    await User.create({ username: "admin", password: "1234" }); // Mot de passe du TP
+    console.log("👤 Utilisateur 'admin' créé (mdp: 1234)");
 }
 
-await seedTests();
-
-// Démarrage
 const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 Serveur backend🧠 démarré🎯 sur http://localhost:${PORT}🌐`));
+app.listen(PORT, () => {
+    console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
+});

@@ -1,69 +1,44 @@
 import express from "express";
-import Operateur from "../models/Operateur.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
-// Login - Sélection d'un opérateur
+// Route de connexion
 router.post("/login", async (req, res) => {
   try {
-    const { operateur_id } = req.body;
+    const { username, password } = req.body;
 
-    // Validation
-    if (!operateur_id) {
-      return res.status(400).json({ error: "ID opérateur requis" });
+    // 1. Chercher l'utilisateur dans la base de données
+    const user = await User.findOne({ where: { username } });
+
+    // 2. Vérifier le mot de passe (comparaison simple pour le TP)
+    if (!user || user.password !== password) {
+      return res.status(401).json({ error: "Identifiants incorrects" });
     }
 
-    const operateurId = parseInt(operateur_id);
-    if (isNaN(operateurId)) {
-      return res.status(400).json({ error: "ID opérateur invalide" });
-    }
+    // 3. Créer la session
+    req.session.userId = user.id;
+    req.session.username = user.username;
 
-    const operateur = await Operateur.findByPk(operateurId);
-    if (!operateur) {
-      return res.status(404).json({ error: "Opérateur non trouvé" });
-    }
-
-    // Créer la session
-    req.session.operateur_id = operateur.id;
-    req.session.operateur_name = `${operateur.nom} ${operateur.prenom}`;
-
-    res.json({
-      success: true,
-      operateur: {
-        id: operateur.id,
-        nom: operateur.nom,
-        prenom: operateur.prenom
-      }
-    });
+    res.json({ success: true, message: "Connexion réussie" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Logout
+// Route de déconnexion
 router.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ error: "Erreur lors de la déconnexion" });
-    }
-    res.json({ success: true, message: "Déconnexion réussie" });
-  });
+  req.session.destroy();
+  res.json({ success: true });
 });
 
-// Vérifier l'état de la session
+// Vérifier si on est connecté (utile pour sécuriser les pages)
 router.get("/me", (req, res) => {
-  if (req.session && req.session.operateur_id) {
-    res.json({
-      authenticated: true,
-      operateur: {
-        id: req.session.operateur_id,
-        name: req.session.operateur_name
-      }
-    });
+  if (req.session.userId) {
+    res.json({ authenticated: true, username: req.session.username });
   } else {
     res.json({ authenticated: false });
   }
 });
 
 export default router;
-
