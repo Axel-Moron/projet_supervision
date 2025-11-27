@@ -4,6 +4,7 @@ import cors from "cors";
 import session from "express-session";
 import mariadb from "mariadb"; 
 import sequelize from "./config/db.js";
+import ModbusRTU from "modbus-serial"; // <--- NOUVEAU
 
 // Modèles
 import Variable from "./models/Variable.js";
@@ -16,38 +17,28 @@ import authRoutes from "./routes/auth.js";
 
 const app = express();
 
-// --- 1. CONFIGURATION AUTOMATIQUE DE LA BDD ---
+// --- VARIABLE GLOBALE D'ÉTAT ---
+let MODE_SIMULATION = true; // Par défaut on simule
+
+// ... (Configuration BDD autoConfigDB identique, je ne la remets pas pour raccourcir, garde la tienne) ...
+// ... Si tu as besoin je peux la remettre, mais c'est la fonction autoConfigDB() d'avant ...
+// Pour faire simple, copie-colle la fonction autoConfigDB() de ton ancien fichier ici.
 async function autoConfigDB() {
     let conn;
     try {
         conn = await mariadb.createConnection({
             host: process.env.DB_HOST || "127.0.0.1",
             user: "root",
-            password: "admin" 
+            password: "admin"
         });
-
-        console.log("🔧 Configuration de la base 'supervision'...");
-
-        // CHANGEMENT ICI : On crée "supervision" au lieu de "qualite_db"
         await conn.query("CREATE DATABASE IF NOT EXISTS supervision");
-        
         await conn.query("CREATE OR REPLACE USER 'db_user'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('strong_password')");
-        
-        // CHANGEMENT ICI : On donne les droits sur "supervision"
         await conn.query("GRANT ALL PRIVILEGES ON supervision.* TO 'db_user'@'localhost'");
-        
         await conn.query("FLUSH PRIVILEGES");
-
-        console.log("✅ Base de données 'supervision' prête !");
-    } catch (err) {
-        console.warn("⚠️ Erreur config auto (vérifie que XAMPP/MariaDB est lancé et le mot de passe root est bon).");
-        console.error(err.message);
-    } finally {
-        if (conn) conn.end();
-    }
+    } catch (err) { console.error(err.message); } 
+    finally { if (conn) conn.end(); }
 }
 
-// --- CONFIGURATION EXPRESS ---
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(session({
@@ -57,39 +48,94 @@ app.use(session({
     cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Routes
 app.use("/api", apiRoutes);
 app.use("/api/auth", authRoutes);
 
-// --- SIMULATION MODBUS ---
-const simulerAutomates = async () => {
+// --- NOUVELLE ROUTE POUR LE SWITCH ---
+app.post("/api/mode", (req, res) => {
+    const { simulation } = req.body;
+    if (typeof simulation === 'boolean') {
+        MODE_SIMULATION = simulation;
+        console.log(`🔄 Mode changé : ${MODE_SIMULATION ? "SIMULATION" : "RÉEL"}`);
+        res.json({ success: true, mode: MODE_SIMULATION });
+    } else {
+        res.status(400).json({ error: "Valeur booléenne attendue" });
+    }
+});
+app.get("/api/mode", (req, res) => {
+    res.json({ mode: MODE_SIMULATION });
+});
+
+// --- FONCTION LECTURE RÉELLE MODBUS ---
+const lireModbusReel = async (variables) => {
+    const now = new Date();
+    
+    for (const v of variables) {
+        const client = new ModbusRTU();
+        try {
+            // 1. Connexion à l'automate (Timeout 2s)
+            await client.connectTCP(v.ip_automate, { port: 502 });
+            client.setID(1);
+            client.setTimeout(2000);
+
+            // 2. Lecture (On suppose que le registre est un Holding Register)
+            // Note: souvent 40001 = adresse 0 ou 1 selon les automates. Ici on prend brut.
+            const addr = parseInt(v.registre); 
+            const data = await client.readHoldingRegisters(addr, 1);
+            
+            let val = data.data[0]; // Valeur brute
+
+            // Si c'est un booléen mais qu'on reçoit un mot, on convertit
+            if (v.type === "boolean") {
+                val = val > 0 ? 1 : 0;
+            } else {
+                // Exemple simple de mise à l'échelle (à adapter selon tes besoins)
+                // Souvent les automates envoient des entiers x10 ou x100
+                val = val / 10; 
+            }
+
+            await Mesure.create({ variable_id: v.id, valeur: val, timestamp: now });
+
+        } catch (error) {
+            console.error(`❌ Erreur Modbus sur ${v.ip_automate} :`, error.message);
+        } finally {
+            client.close();
+        }
+    }
+};
+
+// --- SIMULATION ---
+const simulerAutomates = async (variables) => {
+    const now = new Date();
+    variables.forEach(async (v) => {
+        let randomValue;
+        if (v.type === "boolean") randomValue = Math.random() < 0.5 ? 0 : 1; 
+        else randomValue = (Math.random() * 100).toFixed(2);
+
+        await Mesure.create({ variable_id: v.id, valeur: randomValue, timestamp: now });
+    });
+};
+
+// --- BOUCLE PRINCIPALE ---
+setInterval(async () => {
     try {
         const variables = await Variable.findAll({ where: { actif: true } });
-        const now = new Date();
-        variables.forEach(async (v) => {
-            let randomValue = (Math.random() * 100).toFixed(2);
-            await Mesure.create({ variable_id: v.id, valeur: randomValue, timestamp: now });
-        });
-    } catch (error) {}
-};
-setInterval(simulerAutomates, 5000);
+        
+        if (MODE_SIMULATION) {
+            await simulerAutomates(variables);
+        } else {
+            await lireModbusReel(variables);
+        }
+    } catch (e) { console.error(e); }
+}, 5000);
 
-// --- DÉMARRAGE ---
-await autoConfigDB(); // Lance la création de la base 'supervision'
-
-try {
-    await sequelize.sync({ force: false }); // Crée les tables dans 'supervision'
-    
+// --- DEMARRAGE ---
+const startServer = async () => {
+    await autoConfigDB();
+    await sequelize.sync({ force: false });
     const adminExists = await User.findOne({ where: { username: "admin" } });
-    if (!adminExists) {
-        await User.create({ username: "admin", password: "1234" });
-        console.log("👤 Utilisateur 'admin' créé");
-    }
+    if (!adminExists) await User.create({ username: "admin", password: "1234" });
 
-    const PORT = 3000;
-    app.listen(PORT, () => {
-        console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
-    });
-} catch (error) {
-    console.error("❌ Erreur démarrage :", error.message);
-}
+    app.listen(3000, () => console.log(`🚀 Serveur démarré sur http://localhost:3000`));
+};
+startServer();

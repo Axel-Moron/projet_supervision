@@ -116,7 +116,11 @@
             <option value="1">Oui</option>
             <option value="0">Non</option>
         </select>
-
+        <label>Type de donnée</label>
+        <select id="var-type">
+            <option value="float">Analogique (Ex: Température)</option>
+            <option value="boolean">TOR (Ex: Bouton / Moteur)</option>
+        </select>
         <div class="form-buttons">
             <button class="btn-save">💾 Enregistrer</button>
             <button class="btn-cancel" onclick="closeForm()">Annuler</button>
@@ -155,15 +159,17 @@
         });
     }
 
-    // Sauvegarder nouvelle variable
-    document.querySelector(".btn-save").addEventListener("click", async () => {
-        const data = {
-            nom: document.getElementById("var-nom").value,
-            ip_automate: document.getElementById("var-ip").value,
-            registre: document.getElementById("var-registre").value,
-            frequence: document.getElementById("var-freq").value,
-            actif: document.getElementById("var-actif").value === "1"
-        };
+// Sauvegarder nouvelle variable
+document.querySelector(".btn-save").addEventListener("click", async () => {
+    const data = {
+        nom: document.getElementById("var-nom").value,
+        ip_automate: document.getElementById("var-ip").value,
+        registre: document.getElementById("var-registre").value,
+        type: document.getElementById("var-type").value, // <-- AJOUT ICI
+        frequence: document.getElementById("var-freq").value,
+        actif: document.getElementById("var-actif").value === "1"
+    };
+    // ... reste du code inchangé ...
 
         await fetch(`${API_URL}/variables`, {
             method: "POST",
@@ -179,7 +185,7 @@
         try {
             await fetch("http://localhost:3000/api/auth/logout", { 
                 method: "POST",
-                credentials: "include"
+                 credentials: "include"
             });
         } catch(e) { console.error(e); }
     
