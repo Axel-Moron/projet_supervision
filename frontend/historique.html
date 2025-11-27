@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Historique des données</title>
+    <link rel="stylesheet" href="style-dashboard.css">
+    <script>
+        if (localStorage.getItem("loggedIn") !== "true") { window.location.href = "login.html"; }
+    </script>
+</head>
+
+<body class="dash-body">
+
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <span class="sidebar-logo-icon">🧰</span>
+        <span class="sidebar-logo-text">SUPERVISION</span>
+    </div>
+    <nav class="sidebar-menu">
+        <a href="index.html" class="sidebar-item">📊 <span>Temps réel</span></a>
+        <a href="config.html" class="sidebar-item">⚙️ <span>Paramétrage</span></a>
+        <a href="historique.html" class="sidebar-item active">📅 <span>Historique</span></a>
+    </nav>
+    <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
+</aside>
+
+<div class="main-layout">
+    <header class="topbar">
+        <div>
+            <h1>Historique et Exports</h1>
+            <p>Consultez les anciennes mesures et exportez-les en CSV</p>
+        </div>
+        <div class="topbar-clock">
+            <span id="clock-time">--:--</span>
+        </div>
+    </header>
+
+    <main class="config-container">
+        
+        <section class="card form-card">
+            <h2>Filtres de recherche</h2>
+            <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                
+                <div style="display:flex; flex-direction:column;">
+                    <label>Variable</label>
+                    <select id="filter-var">
+                        <option value="">Toutes les variables</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label>Date début</label>
+                    <input type="date" id="filter-start">
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <label>Date fin</label>
+                    <input type="date" id="filter-end">
+                </div>
+
+                <button class="btn-save" onclick="searchData()">🔍 Rechercher</button>
+                <button class="btn-add" onclick="exportCSV()" style="background:#d48806;">📥 Export CSV</button>
+            </div>
+        </section>
+
+        <section class="card config-card" style="grid-column: 1 / -1;">
+            <h2>Résultats (<span id="res-count">0</span> mesures)</h2>
+            <table class="vars-table">
+                <thead>
+                    <tr>
+                        <th>Date / Heure</th>
+                        <th>Variable</th>
+                        <th>Valeur</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr><td colspan="3" style="text-align:center;">Lancer une recherche...</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+</div>
+
+<script>
+const API_URL = "http://localhost:3000/api";
+let currentData = [];
+
+// 1. Charger la liste des variables au démarrage
+async function loadVars() {
+    const res = await fetch(`${API_URL}/variables`);
+    const vars = await res.json();
+    const select = document.getElementById("filter-var");
+    vars.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.id;
+        opt.textContent = v.nom;
+        select.appendChild(opt);
+    });
+    
+    // Dates par défaut (aujourd'hui)
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("filter-start").value = today;
+    document.getElementById("filter-end").value = today;
+}
+loadVars();
+
+// 2. Rechercher les données
+async function searchData() {
+    const varId = document.getElementById("filter-var").value;
+    const start = document.getElementById("filter-start").value;
+    const end = document.getElementById("filter-end").value;
+
+    const query = new URLSearchParams({ variable_id: varId, start, end });
+    
+    try {
+        const res = await fetch(`${API_URL}/history?${query}`);
+        currentData = await res.json();
+        
+        document.getElementById("res-count").textContent = currentData.length;
+        const tbody = document.getElementById("history-body");
+        tbody.innerHTML = "";
+
+        if(currentData.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;'>Aucune donnée trouvée</td></tr>";
+            return;
+        }
+
+        currentData.forEach(d => {
+            const tr = document.createElement("tr");
+            const dateFmt = new Date(d.timestamp).toLocaleString();
+            tr.innerHTML = `
+                <td>${dateFmt}</td>
+                <td>${d.Variable ? d.Variable.nom : 'Inconnue'}</td>
+                <td><strong>${d.valeur}</strong></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch(e) { console.error(e); }
+}
+
+// 3. Exporter en CSV
+function exportCSV() {
+    if(!currentData.length) return alert("Aucune donnée à exporter");
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Date;Variable;Valeur\r\n"; // En-têtes
+
+    currentData.forEach(row => {
+        const date = new Date(row.timestamp).toLocaleString();
+        const nom = row.Variable ? row.Variable.nom : 'Inconnue';
+        csvContent += `${date};${nom};${row.valeur}\r\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "export_supervision.csv");
+    document.body.appendChild(link);
+    link.click();
+}
+
+function logout() { localStorage.removeItem("loggedIn"); window.location.href = "login.html"; }
+setInterval(() => {
+    document.getElementById("clock-time").textContent = new Date().toLocaleTimeString();
+}, 1000);
+</script>
+
+</body>
+</html>
