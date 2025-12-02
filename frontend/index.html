@@ -76,7 +76,7 @@
             
             <div class="topbar-right">
                 <div class="topbar-badges" style="display: flex; align-items: center; gap: 10px;">
-                    <span class="badge badge-ok">Backend OK</span>
+                    <span id="backend-badge" class="badge badge-ok">Backend OK</span>
                     <span class="badge badge-ok">MariaDB OK</span>
                     
                     <div style="display:flex; align-items:center; background:#0b172d; padding:2px 8px; border-radius:15px; border:1px solid #1c2844;">
@@ -213,14 +213,30 @@
     }
 
     // 3. Boucle principale (Rafraîchissement Dashboard + Synchro Mode)
+    // 3. Boucle principale (Rafraîchissement Dashboard + Synchro Mode)
     async function updateDashboard() {
+        const badge = document.getElementById("backend-badge");
+        const tbody = document.getElementById("vars-body");
+
         try {
-            // A. Synchro du mode (Vérifier si le serveur a redémarré)
-            const resMode = await fetch(`${API_URL}/mode`);
+            // A. Synchro du mode
+            // On ajoute un timeout court (1s) pour détecter vite si le serveur est mort
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+            const resMode = await fetch(`${API_URL}/mode`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+
             const dataMode = await resMode.json();
             
+            // Si on arrive ici, le serveur est VIVANT
+            if(badge.textContent !== "Backend OK") {
+                badge.textContent = "Backend OK";
+                badge.style.backgroundColor = "#2ecc71"; // Vert
+                badge.style.color = "white";
+            }
+
             const checkbox = document.getElementById("mode-switch");
-            // Si l'état du serveur diffère du bouton, on corrige le bouton
             if (checkbox.checked !== dataMode.mode) {
                 checkbox.checked = dataMode.mode;
                 updateSwitchVisuals(dataMode.mode);
@@ -231,7 +247,6 @@
             if(!response.ok) throw new Error("Erreur réseau");
             
             const data = await response.json();
-            const tbody = document.getElementById("vars-body");
             tbody.innerHTML = ""; 
 
             let activeCount = 0;
@@ -241,19 +256,17 @@
             data.forEach(item => {
                 activeCount++;
                 
-                // Logique d'affichage
+                // Logique d'affichage (identique à ton code)
                 let displayValue = item.valeur;
                 let statusClass = "ok";
                 let statusText = "OK";
 
-                // Gestion des erreurs de connexion Modbus (-1)
                 if (item.valeur === -1) {
                     displayValue = "ERREUR COM";
                     statusClass = "err";
                     statusText = "TIMEOUT";
                     errCount++;
                 }
-                // Gestion TOR (Booléen)
                 else if (item.type === "boolean" || (item.valeur == 0 || item.valeur == 1 && item.valeur % 1 == 0)) {
                     if (item.valeur == 1) {
                         displayValue = "MARCHE";
@@ -264,7 +277,6 @@
                         statusText = "STOP";
                     }
                 } 
-                // Gestion Analogique
                 else {
                     let val = parseFloat(item.valeur);
                     displayValue = val.toFixed(2);
@@ -275,7 +287,6 @@
                     }
                 }
 
-                // Création ligne tableau
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td>${item.nom}</td>
@@ -297,10 +308,33 @@
             document.getElementById("sum-rate").textContent = activeCount * (60/5) * 60; 
 
         } catch (e) {
-            console.error("Erreur dashboard:", e);
+            console.error("Serveur déconnecté ou erreur:", e);
+            
+            // --- C'EST ICI QUE ÇA CHANGE L'AFFICHAGE ---
+            
+            // 1. Changer le badge en haut
+            badge.textContent = "Backend OFF";
+            badge.style.backgroundColor = "#ff4b4b"; // Rouge
+            
+            // 2. Vider le tableau et afficher un message clair
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align:center; padding: 20px;">
+                        <span style="color: #ff4b4b; font-weight: bold; font-size: 1.2em;">
+                            ⚠️ CONNEXION AU SERVEUR PERDUE ⚠️
+                        </span><br>
+                        <small style="color: #888;">Vérifiez que le backend Node.js est lancé.</small>
+                    </td>
+                </tr>
+            `;
+
+            // 3. Réinitialiser les KPIs à zéro ou tirets
+            document.getElementById("sum-active").textContent = "-";
+            document.getElementById("sum-warn").textContent = "-";
+            document.getElementById("sum-err").textContent = "-";
         }
     }
-
+    
     // Mise à jour Détails
     function updateDetail(item, displayValue) {
         document.getElementById("rt-var-name").textContent = item.nom;

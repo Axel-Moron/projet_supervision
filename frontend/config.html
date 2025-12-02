@@ -14,7 +14,6 @@
 
 <body class="dash-body">
 
-<!-- Sidebar -->
 <aside class="sidebar">
     <div class="sidebar-logo">
         <span class="sidebar-logo-icon">🧰</span>
@@ -30,7 +29,6 @@
     <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
 </aside>
 
-<!-- Main zone -->
 <div class="main-layout">
 
 <header class="topbar">
@@ -46,7 +44,6 @@
 
 <main class="config-container">
 
-    <!-- Table des variables -->
     <section class="card config-card">
         <h2>Liste des variables</h2>
 
@@ -63,30 +60,7 @@
             </thead>
 
             <tbody id="config-body">
-                <!-- Exemple en attendant le backend -->
-                <tr>
-                    <td>Température four</td>
-                    <td>192.168.0.10</td>
-                    <td>40001</td>
-                    <td>5</td>
-                    <td><span class="pill ok">ON</span></td>
-                    <td>
-                        <button class="btn-small edit-btn">Modifier</button>
-                        <button class="btn-small delete-btn">Supprimer</button>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Pression ligne</td>
-                    <td>192.168.0.11</td>
-                    <td>30002</td>
-                    <td>2</td>
-                    <td><span class="pill ok">ON</span></td>
-                    <td>
-                        <button class="btn-small edit-btn">Modifier</button>
-                        <button class="btn-small delete-btn">Supprimer</button>
-                    </td>
-                </tr>
-
+                <tr><td colspan="6" style="text-align:center;">Chargement des données...</td></tr>
             </tbody>
         </table>
 
@@ -95,7 +69,6 @@
         </div>
     </section>
 
-    <!-- Formulaire d'ajout / modification -->
     <section class="card form-card" id="form-card" style="display:none;">
         <h2 id="form-title">Ajouter une variable</h2>
 
@@ -137,55 +110,89 @@
     // Chargement initial
     loadVariables();
 
-    async function loadVariables() {
-        const response = await fetch(`${API_URL}/variables`);
-        const variables = await response.json();
-        const tbody = document.getElementById("config-body");
-        tbody.innerHTML = "";
+    // Gestion de l'horloge (ajouté car présent dans ton HTML mais sans script)
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
+        document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
 
-        variables.forEach(v => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${v.nom}</td>
-                <td>${v.ip_automate}</td>
-                <td>${v.registre}</td>
-                <td>${v.frequence}</td>
-                <td><span class="pill ${v.actif ? 'ok' : 'err'}">${v.actif ? 'ON' : 'OFF'}</span></td>
-                <td>
-                    <button class="btn-small delete-btn" onclick="deleteVar(${v.id})">Supprimer</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+    async function loadVariables() {
+        try {
+            const response = await fetch(`${API_URL}/variables`);
+            const variables = await response.json();
+            const tbody = document.getElementById("config-body");
+            tbody.innerHTML = ""; // On efface le message "Chargement..."
+
+            if(variables.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune variable configurée.</td></tr>';
+                return;
+            }
+
+            variables.forEach(v => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${v.nom}</td>
+                    <td>${v.ip_automate}</td>
+                    <td>${v.registre}</td>
+                    <td>${v.frequence}</td>
+                    <td><span class="pill ${v.actif ? 'ok' : 'err'}">${v.actif ? 'ON' : 'OFF'}</span></td>
+                    <td>
+                        <button class="btn-small delete-btn" onclick="deleteVar(${v.id})">Supprimer</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error("Erreur chargement variables:", e);
+        }
     }
 
-// Sauvegarder nouvelle variable
-document.querySelector(".btn-save").addEventListener("click", async () => {
-    const data = {
-        nom: document.getElementById("var-nom").value,
-        ip_automate: document.getElementById("var-ip").value,
-        registre: document.getElementById("var-registre").value,
-        type: document.getElementById("var-type").value, // <-- AJOUT ICI
-        frequence: document.getElementById("var-freq").value,
-        actif: document.getElementById("var-actif").value === "1"
-    };
-    // ... reste du code inchangé ...
+    // Sauvegarder nouvelle variable
+    document.querySelector(".btn-save").addEventListener("click", async () => {
+        const data = {
+            nom: document.getElementById("var-nom").value,
+            ip_automate: document.getElementById("var-ip").value,
+            registre: document.getElementById("var-registre").value,
+            type: document.getElementById("var-type").value,
+            frequence: document.getElementById("var-freq").value,
+            actif: document.getElementById("var-actif").value === "1"
+        };
 
-        await fetch(`${API_URL}/variables`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
-        });
+        try {
+            await fetch(`${API_URL}/variables`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            });
 
-        closeForm();
-        loadVariables(); // Recharger le tableau
+            closeForm();
+            loadVariables(); // Recharger le tableau
+        } catch (e) {
+            console.error("Erreur sauvegarde", e);
+        }
     });
 
+    // Suppression d'une variable
+    async function deleteVar(id) {
+        if(!confirm("Voulez-vous vraiment supprimer cette variable ?")) return;
+        
+        try {
+            await fetch(`${API_URL}/variables/${id}`, { method: "DELETE" });
+            loadVariables();
+        } catch (e) {
+            console.error("Erreur suppression", e);
+        }
+    }
+
+    // Déconnexion
     async function logout() {
         try {
             await fetch("http://localhost:3000/api/auth/logout", { 
                 method: "POST",
-                 credentials: "include"
+                credentials: "include"
             });
         } catch(e) { console.error(e); }
     
@@ -193,8 +200,7 @@ document.querySelector(".btn-save").addEventListener("click", async () => {
         window.location.href = "login.html";
     }
 
-    // Fonctions utilitaires existantes
-    function logout() { localStorage.removeItem("loggedIn"); window.location.href = "login.html"; }
+    // Fonctions utilitaires d'interface
     function openForm() { document.getElementById("form-card").style.display = "flex"; }
     function closeForm() { document.getElementById("form-card").style.display = "none"; }
 </script>
