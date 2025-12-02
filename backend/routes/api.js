@@ -13,13 +13,29 @@ router.get("/variables", async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Route pour CRÉER une nouvelle variable
 router.post("/variables", async (req, res) => {
     try {
-        const newVar = await Variable.create(req.body);
-        res.status(201).json(newVar);
-    } catch (err) { res.status(400).json({ error: err.message }); }
-});
+        // On récupère tous les champs, y compris les nouveaux (decimals, unit)
+        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit } = req.body;
 
+        // On crée la variable avec toutes ces infos
+        const variable = await Variable.create({
+            nom,
+            ip_automate,
+            registre,
+            type,
+            frequence,
+            actif,
+            decimals: decimals || 0, // Valeur par défaut si non fourni
+            unit: unit || ""         // Valeur par défaut si non fourni
+        });
+
+        res.json(variable);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 router.delete("/variables/:id", async (req, res) => {
     try {
         await Variable.destroy({ where: { id: req.params.id } });
@@ -52,7 +68,33 @@ router.get("/dashboard", async (req, res) => {
         res.json(dashboardData);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Route pour MODIFIER une variable existante
+router.put("/variables/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit } = req.body;
 
+        const variable = await Variable.findByPk(id);
+        if (!variable) {
+            return res.status(404).json({ error: "Variable introuvable" });
+        }
+
+        // Mise à jour des champs
+        variable.nom = nom;
+        variable.ip_automate = ip_automate;
+        variable.registre = registre;
+        variable.type = type;
+        variable.frequence = frequence;
+        variable.actif = actif;
+        variable.decimals = decimals;
+        variable.unit = unit;
+
+        await variable.save();
+        res.json({ success: true, variable });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 // --- HISTORIQUE (Nouvelle route !) ---
 router.get("/history", async (req, res) => {
     try {

@@ -83,19 +83,20 @@ const lireModbusReel = async (variables) => {
             const addr = parseInt(v.registre); 
             let val;
 
-            // --- CORRECTION ICI ---
+
             if (v.type === "boolean") {
-                // Lecture d'un COIL (Bit / %M)
-                // Note: readCoils retourne un tableau de booléens [true, false...]
-                const data = await client.readCoils(addr, 1);
-                val = data.data[0] ? 1 : 0; // Conversion true/false en 1/0
-                
-            } else {
-                // Lecture d'un REGISTER (Mot / %MW)
-                const data = await client.readHoldingRegisters(addr, 1);
-                val = data.data[0];
-                val = val / 100; // Ton calcul pour les décimales
-            }
+            const data = await client.readCoils(addr, 1);
+            val = data.data[0] ? 1 : 0;
+              } else {
+            // Lecture d'un MOT (%MW)
+            const data = await client.readHoldingRegisters(addr, 1);
+            let rawValue = data.data[0];
+
+            // --- NOUVEAU CALCUL AVEC DÉCIMALES ---
+            // Si decimals = 2, on divise par 10 puissance 2 (100)
+            const divisor = Math.pow(10, v.decimals || 0); 
+            val = rawValue / divisor;
+}
 
             console.log(`✅ Succès ${v.nom} : ${val}`);
             await Mesure.create({ variable_id: v.id, valeur: val, timestamp: now });

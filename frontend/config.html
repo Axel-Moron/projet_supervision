@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="style-dashboard.css">
 
     <script>
+        // Sécurité : redirection si non connecté
         if (localStorage.getItem("loggedIn") !== "true") {
             window.location.href = "login.html";
         }
@@ -31,86 +32,127 @@
 
 <div class="main-layout">
 
-<header class="topbar">
-    <div>
-        <h1>Paramétrage des variables</h1>
-        <p>Ajoute, modifie ou supprime des variables à superviser</p>
-    </div>
-    <div class="topbar-clock">
-        <span id="clock-time">--:--</span>
-        <span id="clock-date">--/--/----</span>
-    </div>
-</header>
-
-<main class="config-container">
-
-    <section class="card config-card">
-        <h2>Liste des variables</h2>
-
-        <table class="vars-table">
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th>IP automate</th>
-                    <th>Registre</th>
-                    <th>Fréquence (s)</th>
-                    <th>Actif</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-
-            <tbody id="config-body">
-                <tr><td colspan="6" style="text-align:center;">Chargement des données...</td></tr>
-            </tbody>
-        </table>
-
-        <div class="config-footer">
-            <button class="btn-add" onclick="openForm()">➕ Ajouter une variable</button>
+    <header class="topbar">
+        <div>
+            <h1>Paramétrage des variables</h1>
+            <p>Ajoute, modifie ou supprime des variables à superviser</p>
         </div>
-    </section>
-
-    <section class="card form-card" id="form-card" style="display:none;">
-        <h2 id="form-title">Ajouter une variable</h2>
-
-        <label>Nom de la variable</label>
-        <input type="text" id="var-nom">
-
-        <label>IP automate</label>
-        <input type="text" id="var-ip">
-
-        <label>Registre / Adresse</label>
-        <input type="text" id="var-registre">
-
-        <label>Fréquence (sec)</label>
-        <input type="number" id="var-freq">
-
-        <label>Actif</label>
-        <select id="var-actif">
-            <option value="1">Oui</option>
-            <option value="0">Non</option>
-        </select>
-        <label>Type de donnée</label>
-        <select id="var-type">
-            <option value="float">Analogique (Ex: Température)</option>
-            <option value="boolean">TOR (Ex: Bouton / Moteur)</option>
-        </select>
-        <div class="form-buttons">
-            <button class="btn-save">💾 Enregistrer</button>
-            <button class="btn-cancel" onclick="closeForm()">Annuler</button>
+        <div class="topbar-clock">
+            <span id="clock-time">--:--</span>
+            <span id="clock-date">--/--/----</span>
         </div>
-    </section>
+    </header>
 
-</main>
+    <main class="config-container">
 
+        <section class="card config-card">
+            <h2>Liste des variables</h2>
+
+            <table class="vars-table">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>IP automate</th>
+                        <th>Registre</th>
+                        <th>Format</th> <th>Unité</th>  <th>Fréq.</th>
+                        <th>Actif</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody id="config-body">
+                    <tr><td colspan="8" style="text-align:center;">Chargement des données...</td></tr>
+                </tbody>
+            </table>
+
+            <div class="config-footer">
+                <button class="btn-add" onclick="openForm()">➕ Ajouter une variable</button>
+            </div>
+        </section>
+
+        <section class="card form-card" id="form-card" style="display:none;">
+            <h2 id="form-title">Ajouter une variable</h2>
+            
+            <input type="hidden" id="var-id"> 
+
+            <label>Nom de la variable</label>
+            <input type="text" id="var-nom" placeholder="Ex: Température Four">
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex:1">
+                    <label>IP automate</label>
+                    <input type="text" id="var-ip" placeholder="192.168.0.10">
+                </div>
+                <div style="flex:1">
+                    <label>Registre (%MW)</label>
+                    <input type="number" id="var-registre" placeholder="Ex: 40001">
+                </div>
+            </div>
+
+            <label>Type de donnée</label>
+            <select id="var-type" onchange="toggleAnalogOptions()">
+                <option value="float">Analogique (Valeur numérique)</option>
+                <option value="boolean">TOR (Marche/Arrêt - 0 ou 1)</option>
+            </select>
+
+            <div id="analog-options" style="background: #f0f4ff; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #dbeafe;">
+                
+                <label style="color: #1a73e8; font-weight: bold;">Position de la virgule (Décimales)</label>
+                <p style="font-size: 0.8em; color: #666; margin-top: -5px; margin-bottom: 5px;">
+                    Exemple : Si l'automate envoie 1234
+                </p>
+                <select id="var-decimals">
+                    <option value="0">0 décimale (Valeur = 1234)</option>
+                    <option value="1">1 décimale (Valeur = 123.4)</option>
+                    <option value="2" selected>2 décimales (Valeur = 12.34)</option>
+                    <option value="3">3 décimales (Valeur = 1.234)</option>
+                </select>
+
+                <label style="color: #1a73e8; font-weight: bold; margin-top: 10px;">Unité d'affichage</label>
+                <select id="var-unit">
+                    <option value="">Aucune</option>
+                    <option value="°C">°C (Degré Celsius)</option>
+                    <option value="%">% (Pourcentage)</option>
+                    <option value="bar">bar (Pression)</option>
+                    <option value="Hz">Hz (Fréquence)</option>
+                    <option value="A">A (Ampère)</option>
+                    <option value="V">V (Volt)</option>
+                    <option value="rpm">rpm (Tours/min)</option>
+                    <option value="m³">m³ (Volume)</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex:1">
+                    <label>Fréquence (sec)</label>
+                    <input type="number" id="var-freq" value="5" min="1">
+                </div>
+                <div style="flex:1">
+                    <label>Actif</label>
+                    <select id="var-actif">
+                        <option value="1">Oui</option>
+                        <option value="0">Non</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-buttons">
+                <button class="btn-save" onclick="saveVariable()">💾 Enregistrer</button>
+                <button class="btn-cancel" onclick="closeForm()">Annuler</button>
+            </div>
+        </section>
+
+    </main>
 </div>
 
 <script>
     const API_URL = "http://localhost:3000/api";
+    let isEditing = false; // Variable pour savoir si on est en mode Modification
 
     // Chargement initial
     loadVariables();
 
-    // Gestion de l'horloge (ajouté car présent dans ton HTML mais sans script)
+    // Horloge
     function updateClock() {
         const now = new Date();
         document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
@@ -119,90 +161,153 @@
     setInterval(updateClock, 1000);
     updateClock();
 
+    // Afficher/Masquer les options décimales/unités
+    function toggleAnalogOptions() {
+        const type = document.getElementById("var-type").value;
+        const optionsDiv = document.getElementById("analog-options");
+        optionsDiv.style.display = (type === "float") ? "block" : "none";
+    }
+
+    // --- 1. Charger et afficher les variables ---
     async function loadVariables() {
         try {
             const response = await fetch(`${API_URL}/variables`);
             const variables = await response.json();
             const tbody = document.getElementById("config-body");
-            tbody.innerHTML = ""; // On efface le message "Chargement..."
+            tbody.innerHTML = ""; 
 
             if(variables.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune variable configurée.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Aucune variable configurée.</td></tr>';
                 return;
             }
 
             variables.forEach(v => {
+                // Astuce pour passer l'objet complet au bouton modifier
+                // On remplace les guillemets simples pour éviter de casser le HTML
+                const jsonVar = JSON.stringify(v).replace(/'/g, "&#39;");
+
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td>${v.nom}</td>
                     <td>${v.ip_automate}</td>
                     <td>${v.registre}</td>
-                    <td>${v.frequence}</td>
+                    <td>${v.type === 'float' ? (v.decimals > 0 ? '/ 10^'+v.decimals : 'Entier') : '-'}</td>
+                    <td>${v.unit || '-'}</td>
+                    <td>${v.frequence}s</td>
                     <td><span class="pill ${v.actif ? 'ok' : 'err'}">${v.actif ? 'ON' : 'OFF'}</span></td>
                     <td>
+                        <button class="btn-small edit-btn" onclick='editVar(${jsonVar})'>Modifier</button>
                         <button class="btn-small delete-btn" onclick="deleteVar(${v.id})">Supprimer</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         } catch (e) {
-            console.error("Erreur chargement variables:", e);
+            console.error("Erreur chargement:", e);
         }
     }
 
-    // Sauvegarder nouvelle variable
-    document.querySelector(".btn-save").addEventListener("click", async () => {
+    // --- 2. Ouvrir le formulaire en mode AJOUT ---
+    function openForm() {
+        isEditing = false;
+        document.getElementById("form-title").innerText = "Ajouter une variable";
+        document.getElementById("var-id").value = "";
+        
+        // Reset des champs
+        document.getElementById("var-nom").value = "";
+        document.getElementById("var-ip").value = "192.168.0.10";
+        document.getElementById("var-registre").value = "";
+        document.getElementById("var-type").value = "float";
+        document.getElementById("var-decimals").value = "2";
+        document.getElementById("var-unit").value = "";
+        document.getElementById("var-freq").value = "5";
+        document.getElementById("var-actif").value = "1";
+        
+        toggleAnalogOptions(); // Mise à jour affichage
+        document.getElementById("form-card").style.display = "flex";
+    }
+
+    // --- 3. Ouvrir le formulaire en mode MODIFICATION ---
+    function editVar(variable) {
+        isEditing = true;
+        document.getElementById("form-title").innerText = "Modifier : " + variable.nom;
+        document.getElementById("var-id").value = variable.id;
+
+        // Remplissage des champs
+        document.getElementById("var-nom").value = variable.nom;
+        document.getElementById("var-ip").value = variable.ip_automate;
+        document.getElementById("var-registre").value = variable.registre;
+        document.getElementById("var-type").value = variable.type;
+        document.getElementById("var-freq").value = variable.frequence;
+        document.getElementById("var-actif").value = variable.actif ? "1" : "0";
+        
+        // Champs optionnels
+        document.getElementById("var-decimals").value = variable.decimals || 0;
+        document.getElementById("var-unit").value = variable.unit || "";
+
+        toggleAnalogOptions(); // Mise à jour affichage
+        document.getElementById("form-card").style.display = "flex";
+    }
+
+    // --- 4. Sauvegarder (Gère Création ET Modification) ---
+    async function saveVariable() {
+        const id = document.getElementById("var-id").value;
+        
         const data = {
             nom: document.getElementById("var-nom").value,
             ip_automate: document.getElementById("var-ip").value,
             registre: document.getElementById("var-registre").value,
             type: document.getElementById("var-type").value,
             frequence: document.getElementById("var-freq").value,
-            actif: document.getElementById("var-actif").value === "1"
+            actif: document.getElementById("var-actif").value === "1",
+            decimals: document.getElementById("var-decimals").value,
+            unit: document.getElementById("var-unit").value
         };
 
+        let url = `${API_URL}/variables`;
+        let method = "POST";
+
+        // Si on a un ID, c'est une modification -> PUT
+        if (isEditing && id) {
+            url = `${API_URL}/variables/${id}`;
+            method = "PUT";
+        }
+
         try {
-            await fetch(`${API_URL}/variables`, {
-                method: "POST",
+            const resp = await fetch(url, {
+                method: method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data)
             });
-
-            closeForm();
-            loadVariables(); // Recharger le tableau
+            
+            if(resp.ok) {
+                closeForm();
+                loadVariables(); // Rafraîchir le tableau
+            } else {
+                alert("Erreur lors de la sauvegarde");
+            }
         } catch (e) {
-            console.error("Erreur sauvegarde", e);
+            console.error(e);
         }
-    });
+    }
 
-    // Suppression d'une variable
+    // --- 5. Supprimer ---
     async function deleteVar(id) {
         if(!confirm("Voulez-vous vraiment supprimer cette variable ?")) return;
-        
         try {
             await fetch(`${API_URL}/variables/${id}`, { method: "DELETE" });
             loadVariables();
-        } catch (e) {
-            console.error("Erreur suppression", e);
-        }
+        } catch (e) { console.error(e); }
     }
 
-    // Déconnexion
-    async function logout() {
-        try {
-            await fetch("http://localhost:3000/api/auth/logout", { 
-                method: "POST",
-                credentials: "include"
-            });
-        } catch(e) { console.error(e); }
+    // --- 6. Utilitaires ---
+    function closeForm() { document.getElementById("form-card").style.display = "none"; }
     
+    async function logout() {
+        try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch(e) {}
         localStorage.removeItem("loggedIn");
         window.location.href = "login.html";
     }
-
-    // Fonctions utilitaires d'interface
-    function openForm() { document.getElementById("form-card").style.display = "flex"; }
-    function closeForm() { document.getElementById("form-card").style.display = "none"; }
 </script>
 
 </body>
