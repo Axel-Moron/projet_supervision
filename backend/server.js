@@ -68,38 +68,41 @@ app.get("/api/mode", (req, res) => {
     res.json({ mode: MODE_SIMULATION });
 });
 
-// --- FONCTION LECTURE RÉELLE MODBUS ---
+// --- FONCTION LECTURE RÉELLE MODBUS CORRIGÉE ---
 const lireModbusReel = async (variables) => {
     const now = new Date();
     
     for (const v of variables) {
         const client = new ModbusRTU();
         try {
-            // console.log(`🔌 Connexion à ${v.ip_automate}...`);
-            
-            // On ajoute un timeout de connexion pour ne pas bloquer
+            // Connexion (inchangée)
             await client.connectTCP(v.ip_automate, { port: 502 });
             client.setID(1);
             client.setTimeout(2000);
 
             const addr = parseInt(v.registre); 
-            const data = await client.readHoldingRegisters(addr, 1);
-            
-            let val = data.data[0];
+            let val;
 
+            // --- CORRECTION ICI ---
             if (v.type === "boolean") {
-                val = val > 0 ? 1 : 0;
+                // Lecture d'un COIL (Bit / %M)
+                // Note: readCoils retourne un tableau de booléens [true, false...]
+                const data = await client.readCoils(addr, 1);
+                val = data.data[0] ? 1 : 0; // Conversion true/false en 1/0
+                
             } else {
-                val = val / 100; 
+                // Lecture d'un REGISTER (Mot / %MW)
+                const data = await client.readHoldingRegisters(addr, 1);
+                val = data.data[0];
+                val = val / 100; // Ton calcul pour les décimales
             }
 
             console.log(`✅ Succès ${v.nom} : ${val}`);
             await Mesure.create({ variable_id: v.id, valeur: val, timestamp: now });
 
         } catch (error) {
-            // On filtre les erreurs pour ne pas polluer la console si c'est juste un timeout
             if(error.code !== 'ETIMEDOUT') {
-                console.error(`❌ Erreur Modbus sur ${v.ip_automate} :`, error.message);
+                console.error(`❌ Erreur Modbus sur ${v.ip_automate} (Var: ${v.nom}) :`, error.message);
             }
             
             await Mesure.create({ 
@@ -109,12 +112,8 @@ const lireModbusReel = async (variables) => {
             });
 
         } finally {
-            // Fermeture propre
             try { await client.close(); } catch(e) {}
-            
-            // --- C'EST ICI QUE LA MAGIE OPÈRE ---
-            // On attend 500ms avant de passer à la variable suivante
-            // pour ne pas spammer l'automate et éviter le ECONNRESET
+            // Pause pour éviter de saturer l'automate
             await sleep(500); 
         }
     }
