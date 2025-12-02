@@ -136,9 +136,10 @@
                     </div>
                 </div>
 
-                <div class="trend-placeholder">
-                    <span>Graphique temps réel (Chart.js ici)</span>
+                <div class="trend-container">
+                    <canvas id="realtimeChart"></canvas>
                 </div>
+
             </section>
 
             <section class="card summary-card">
@@ -337,16 +338,22 @@
     
     // Mise à jour Détails
     function updateDetail(item, displayValue) {
-        document.getElementById("rt-var-name").textContent = item.nom;
-        document.getElementById("rt-value").textContent = displayValue;
-        
-        if(item.timestamp) {
-            const dateObj = new Date(item.timestamp);
-            document.getElementById("rt-timestamp").textContent = "à " + dateObj.toLocaleTimeString();
-        } else {
-            document.getElementById("rt-timestamp").textContent = "--:--:--";
-        }
+    document.getElementById("rt-var-name").textContent = item.nom;
+    document.getElementById("rt-value").textContent = displayValue;
+
+    if(item.timestamp) {
+        const dateObj = new Date(item.timestamp);
+        document.getElementById("rt-timestamp").textContent = "à " + dateObj.toLocaleTimeString();
+    } else {
+        document.getElementById("rt-timestamp").textContent = "--:--:--";
     }
+
+    // --- Envoi au graphe ---
+    if (!isNaN(displayValue)) {
+        startRealtime(parseFloat(displayValue));
+    }
+}
+
 
     // Déconnexion
     async function logout() {
@@ -365,6 +372,9 @@
     updateDashboard(); // Immédiat
 
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="realtime.js"></script>
+
 
 </body>
 </html>
