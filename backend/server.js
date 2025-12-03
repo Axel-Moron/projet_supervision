@@ -148,7 +148,7 @@ setInterval(async () => {
 // --- DEMARRAGE ---
 const startServer = async () => {
     await autoConfigDB();
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ alter: true });
     const adminExists = await User.findOne({ where: { username: "admin" } });
     if (!adminExists) await User.create({ username: "admin", password: "1234" });
 

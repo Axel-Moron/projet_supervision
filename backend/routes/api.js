@@ -1,5 +1,5 @@
 import express from "express";
-import { Op } from "sequelize"; // Important pour les filtres de dates
+import { Op } from "sequelize"; 
 import Variable from "../models/Variable.js";
 import Mesure from "../models/Mesure.js";
 
@@ -16,10 +16,9 @@ router.get("/variables", async (req, res) => {
 // Route pour CRÉER une nouvelle variable
 router.post("/variables", async (req, res) => {
     try {
-        // On récupère tous les champs, y compris les nouveaux (decimals, unit)
-        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit } = req.body;
+        // CORRECTION : On récupère bien tous les champs ici
+        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit, seuil_min, seuil_max } = req.body;
 
-        // On crée la variable avec toutes ces infos
         const variable = await Variable.create({
             nom,
             ip_automate,
@@ -27,8 +26,10 @@ router.post("/variables", async (req, res) => {
             type,
             frequence,
             actif,
-            decimals: decimals || 0, // Valeur par défaut si non fourni
-            unit: unit || ""         // Valeur par défaut si non fourni
+            decimals: decimals || 0, 
+            unit: unit || "" ,
+            seuil_min: seuil_min !== "" ? seuil_min : null,
+            seuil_max: seuil_max !== "" ? seuil_max : null
         });
 
         res.json(variable);
@@ -36,11 +37,44 @@ router.post("/variables", async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
 router.delete("/variables/:id", async (req, res) => {
     try {
         await Variable.destroy({ where: { id: req.params.id } });
         res.json({ message: "Supprimé" });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Route pour MODIFIER une variable existante
+router.put("/variables/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        // CORRECTION 1 : Ajout de seuil_min et seuil_max dans la récupération
+        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit, seuil_min, seuil_max } = req.body;
+
+        const variable = await Variable.findByPk(id);
+        if (!variable) {
+            return res.status(404).json({ error: "Variable introuvable" });
+        }
+
+        // Mise à jour des champs
+        variable.nom = nom;
+        variable.ip_automate = ip_automate;
+        variable.registre = registre;
+        variable.type = type;
+        variable.frequence = frequence;
+        variable.actif = actif;
+        variable.decimals = decimals;
+        variable.unit = unit;
+        variable.seuil_min = (seuil_min !== "") ? seuil_min : null;
+        variable.seuil_max = (seuil_max !== "") ? seuil_max : null;
+
+        // CORRECTION 2 : Une seule sauvegarde
+        await variable.save();
+        res.json({ success: true, variable });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // --- SUPERVISION (Dashboard) ---
@@ -61,6 +95,14 @@ router.get("/dashboard", async (req, res) => {
                 ip: v.ip_automate,
                 registre: v.registre,
                 frequence: v.frequence,
+                type: v.type, // Utile pour le frontend
+                
+                // CORRECTION 3 : Il faut renvoyer ces infos au frontend pour les alertes !
+                decimals: v.decimals,
+                unit: v.unit,
+                seuil_min: v.seuil_min,
+                seuil_max: v.seuil_max,
+
                 valeur: lastMesure ? lastMesure.valeur : null,
                 timestamp: lastMesure ? lastMesure.timestamp : null
             });
@@ -68,47 +110,18 @@ router.get("/dashboard", async (req, res) => {
         res.json(dashboardData);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-// Route pour MODIFIER une variable existante
-router.put("/variables/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const { nom, ip_automate, registre, type, frequence, actif, decimals, unit } = req.body;
 
-        const variable = await Variable.findByPk(id);
-        if (!variable) {
-            return res.status(404).json({ error: "Variable introuvable" });
-        }
-
-        // Mise à jour des champs
-        variable.nom = nom;
-        variable.ip_automate = ip_automate;
-        variable.registre = registre;
-        variable.type = type;
-        variable.frequence = frequence;
-        variable.actif = actif;
-        variable.decimals = decimals;
-        variable.unit = unit;
-
-        await variable.save();
-        res.json({ success: true, variable });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-// --- HISTORIQUE (Nouvelle route !) ---
+// --- HISTORIQUE ---
 router.get("/history", async (req, res) => {
     try {
         const { variable_id, start, end } = req.query;
         const whereClause = {};
 
-        // Filtre par variable (si sélectionnée)
         if (variable_id) {
             whereClause.variable_id = variable_id;
         }
 
-        // Filtre par date
         if (start && end) {
-            // On ajoute les heures pour couvrir toute la journée
             const startDate = new Date(start);
             startDate.setHours(0,0,0,0);
             
@@ -122,9 +135,9 @@ router.get("/history", async (req, res) => {
 
         const mesures = await Mesure.findAll({
             where: whereClause,
-            include: [{ model: Variable, attributes: ['nom'] }], // Inclure le nom de la variable
+            include: [{ model: Variable, attributes: ['nom'] }],
             order: [["timestamp", "DESC"]],
-            limit: 500 // Limite pour éviter de faire exploser le navigateur
+            limit: 500 
         });
 
         res.json(mesures);

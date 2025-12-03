@@ -135,6 +135,16 @@
                     </select>
                 </div>
             </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+        <div style="flex:1">
+            <label style="color: #d35400;">Seuil Min (Alerte basse)</label>
+            <input type="number" id="var-min" placeholder="Ex: 10">
+        </div>
+        <div style="flex:1">
+            <label style="color: #c0392b;">Seuil Max (Alerte haute)</label>
+            <input type="number" id="var-max" placeholder="Ex: 80">
+        </div>
+    </div>
 
             <div class="form-buttons">
                 <button class="btn-save" onclick="saveVariable()">💾 Enregistrer</button>
@@ -261,7 +271,9 @@
             frequence: document.getElementById("var-freq").value,
             actif: document.getElementById("var-actif").value === "1",
             decimals: document.getElementById("var-decimals").value,
-            unit: document.getElementById("var-unit").value
+            unit: document.getElementById("var-unit").value,
+            seuil_min: document.getElementById("var-min").value,
+            seuil_max: document.getElementById("var-max").value
         };
 
         let url = `${API_URL}/variables`;

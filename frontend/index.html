@@ -6,46 +6,23 @@
     <link rel="stylesheet" href="style-dashboard.css">
 
     <script>
+        // Sécurité : Si pas connecté, retour au login
         if (localStorage.getItem("loggedIn") !== "true") {
             window.location.href = "login.html";
         }
     </script>
 
     <style>
-        /* Conteneur du Switch */
+        /* Styles spécifiques au Switch Mode (Simu/Réel) */
         .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
         .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #2ecc71; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #ff4b4b; } /* Rouge quand Simu */
+        input:checked + .slider:before { transform: translateX(16px); }
         
-        /* Par défaut (Non coché = MODE RÉEL) -> VERT */
-        .slider { 
-            position: absolute; cursor: pointer; 
-            top: 0; left: 0; right: 0; bottom: 0; 
-            background-color: #2ecc71; /* Vert */
-            -webkit-transition: .4s; transition: .4s; 
-            border-radius: 34px; 
-        }
-        
-        .slider:before { 
-            position: absolute; content: ""; 
-            height: 14px; width: 14px; 
-            left: 2px; bottom: 2px; 
-            background-color: white; 
-            -webkit-transition: .4s; transition: .4s; 
-            border-radius: 50%; 
-        }
-
-        /* Quand on coche (MODE SIMULATION) -> ROUGE */
-        input:checked + .slider { 
-            background-color: #ff4b4b; /* Rouge */
-        } 
-        
-        input:focus + .slider { box-shadow: 0 0 1px #ff4b4b; }
-        
-        input:checked + .slider:before { 
-            -webkit-transform: translateX(16px); 
-            -ms-transform: translateX(16px); 
-            transform: translateX(16px); 
-        }
+        /* Badge Backend */
+        #backend-badge { transition: background-color 0.3s; }
     </style>
 </head>
 
@@ -71,16 +48,15 @@
         <header class="topbar">
             <div>
                 <h1>Supervision des variables process</h1>
-                <p>TP – Déploiement d’un SI (Node / MariaDB / Docker)</p>
+                <p>État en temps réel de l'installation</p>
             </div>
             
             <div class="topbar-right">
                 <div class="topbar-badges" style="display: flex; align-items: center; gap: 10px;">
                     <span id="backend-badge" class="badge badge-ok">Backend OK</span>
-                    <span class="badge badge-ok">MariaDB OK</span>
                     
-                    <div style="display:flex; align-items:center; background:#0b172d; padding:2px 8px; border-radius:15px; border:1px solid #1c2844;">
-                        <span id="mode-label" style="font-size:10px; margin-right:8px; color:#2ecc71;">MODBUS RÉEL</span>
+                    <div style="display:flex; align-items:center; background:#0b172d; padding:4px 10px; border-radius:15px; border:1px solid #1c2844;">
+                        <span id="mode-label" style="font-size:10px; margin-right:8px; color:#2ecc71; font-weight:bold;">MODBUS RÉEL</span>
                         <label class="switch">
                             <input type="checkbox" id="mode-switch" onchange="toggleMode()">
                             <span class="slider round"></span>
@@ -106,68 +82,48 @@
                             <th>Nom</th>
                             <th>IP automate</th>
                             <th>Registre</th>
-                            <th>Fréq. (s)</th>
-                            <th>Dernière valeur</th>
-                            <th>Statut</th>
+                            <th>Valeur</th>
+                            <th>État</th>
                         </tr>
                     </thead>
                     <tbody id="vars-body">
-                        <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
+                        <tr><td colspan="5" style="text-align:center;">Connexion au serveur...</td></tr>
                     </tbody>
                 </table>
-
-                <div class="vars-footer">
-                    <button class="btn-link" onclick="window.location.href='config.html'">
-                        ⚙️ Gérer les variables
-                    </button>
-                </div>
             </section>
 
             <section class="card realtime-card">
                 <div class="realtime-header">
                     <div>
-                        <h2>Temps réel – <span id="rt-var-name">Sélectionnez une variable</span></h2>
-                        <p>Dernières 2 minutes (rafraîchissement périodique côté backend)</p>
+                        <h2>Détails – <span id="rt-var-name">...</span></h2>
+                        <p>Sélectionnez une ligne dans le tableau</p>
                     </div>
                     <div class="rt-current">
-                        <span class="label">Dernière valeur</span>
+                        <span class="label">Dernière lecture</span>
                         <span class="rt-value" id="rt-value">--</span>
                         <span class="rt-timestamp" id="rt-timestamp">--:--:--</span>
                     </div>
                 </div>
-
-                <div class="trend-container">
-                    <canvas id="realtimeChart"></canvas>
+                <div class="trend-placeholder" style="display:flex; align-items:center; justify-content:center; color:#666;">
+                    <span>(Graphique temps réel à venir)</span>
                 </div>
-
             </section>
 
             <section class="card summary-card">
-                <h2>Résumé supervision</h2>
-
+                <h2>Résumé</h2>
                 <div class="summary-grid">
                     <div class="summary-item">
-                        <span class="label">Variables actives</span>
+                        <span class="label">Actives</span>
                         <span class="value big" id="sum-active">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Variables en seuil</span>
+                        <span class="label">Alertes (Seuil)</span>
                         <span class="value big warn" id="sum-warn">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="label">Variables en défaut</span>
+                        <span class="label">Erreurs Com.</span>
                         <span class="value big err" id="sum-err">0</span>
                     </div>
-                    <div class="summary-item">
-                        <span class="label">Total mesures / h</span>
-                        <span class="value big" id="sum-rate">--</span>
-                    </div>
-                </div>
-
-                <div class="summary-footer">
-                    <button class="btn-link" onclick="window.location.href='historique.html'">
-                        📅 Voir historique & export CSV
-                    </button>
                 </div>
             </section>
 
@@ -191,8 +147,6 @@
     async function toggleMode() {
         const isSimu = document.getElementById("mode-switch").checked;
         updateSwitchVisuals(isSimu);
-
-        // Envoyer au backend
         try {
             await fetch(`${API_URL}/mode`, {
                 method: "POST",
@@ -213,168 +167,165 @@
         }
     }
 
-    // 3. Boucle principale (Rafraîchissement Dashboard + Synchro Mode)
-    // 3. Boucle principale (Rafraîchissement Dashboard + Synchro Mode)
+    // 3. Boucle principale (Rafraîchissement Dashboard)
     async function updateDashboard() {
         const badge = document.getElementById("backend-badge");
         const tbody = document.getElementById("vars-body");
 
         try {
-            // A. Synchro du mode
-            // On ajoute un timeout court (1s) pour détecter vite si le serveur est mort
+            // A. Vérification connexion (Timeout court 1s)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 1000);
 
+            // On vérifie le mode en premier pour voir si le backend répond
             const resMode = await fetch(`${API_URL}/mode`, { signal: controller.signal });
             clearTimeout(timeoutId);
-
             const dataMode = await resMode.json();
-            
-            // Si on arrive ici, le serveur est VIVANT
+
+            // Si on est là, le backend est VIVANT
             if(badge.textContent !== "Backend OK") {
                 badge.textContent = "Backend OK";
-                badge.style.backgroundColor = "#2ecc71"; // Vert
-                badge.style.color = "white";
+                badge.style.backgroundColor = "#2ecc71"; 
             }
 
+            // Synchro du bouton switch si besoin
             const checkbox = document.getElementById("mode-switch");
             if (checkbox.checked !== dataMode.mode) {
                 checkbox.checked = dataMode.mode;
                 updateSwitchVisuals(dataMode.mode);
             }
 
-            // B. Récupération des données
+            // B. Récupération des données Dashboard
             const response = await fetch(`${API_URL}/dashboard`);
-            if(!response.ok) throw new Error("Erreur réseau");
-            
             const data = await response.json();
+            
             tbody.innerHTML = ""; 
 
             let activeCount = 0;
             let warnCount = 0;
             let errCount = 0;
 
+            if(data.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Aucune variable active.</td></tr>`;
+            }
+
+            // C. Boucle sur chaque variable
             data.forEach(item => {
                 activeCount++;
                 
-                // Logique d'affichage (identique à ton code)
-                let displayValue = item.valeur;
+                let displayValue = "";
                 let statusClass = "ok";
                 let statusText = "OK";
 
-                if (item.valeur === -1) {
-                    displayValue = "ERREUR COM";
+                // Cas 1 : Erreur de communication ou valeur nulle
+                if (item.valeur === null || item.valeur === -1) {
+                    displayValue = "ERREUR";
                     statusClass = "err";
                     statusText = "TIMEOUT";
                     errCount++;
                 }
-                else if (item.type === "boolean" || (item.valeur == 0 || item.valeur == 1 && item.valeur % 1 == 0)) {
+                // Cas 2 : Booléen (TOR)
+                else if (item.type === "boolean") {
                     if (item.valeur == 1) {
-                        displayValue = "MARCHE";
+                        displayValue = "MARCHE (1)";
                         statusClass = "ok";
                     } else {
-                        displayValue = "ARRÊT";
-                        statusClass = "warn";
-                        statusText = "STOP";
+                        displayValue = "ARRÊT (0)";
+                        statusClass = "warn"; // Ou gris
+                        statusText = "OFF";
                     }
                 } 
+                // Cas 3 : Analogique (Nombre)
                 else {
                     let val = parseFloat(item.valeur);
-                    displayValue = val.toFixed(2);
-                    if(val > 80) {
-                        statusClass = "err";
-                        statusText = "ALERTE";
-                        warnCount++; 
+                    
+                    // Formatage (Décimales + Unité)
+                    displayValue = val.toFixed(item.decimals || 0);
+                    if(item.unit) displayValue += " " + item.unit;
+
+                    // --- LOGIQUE DES SEUILS (ALERTE) ---
+                    if (item.seuil_max !== null && val > item.seuil_max) {
+                        statusClass = "err";   // Rouge
+                        statusText = "HAUT";
+                        warnCount++;
+                    }
+                    else if (item.seuil_min !== null && val < item.seuil_min) {
+                        statusClass = "warn";  // Orange
+                        statusText = "BAS";
+                        warnCount++;
                     }
                 }
 
+                // Création de la ligne HTML
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td>${item.nom}</td>
-                    <td>${item.ip}</td>
-                    <td>${item.registre}</td>
-                    <td>${item.frequence}</td>
-                    <td style="font-weight:bold; color:#e5ecff;">${displayValue}</td>
+                    <td style="font-weight:bold;">${item.nom}</td>
+                    <td style="color:#8899ac;">${item.ip}</td>
+                    <td style="color:#8899ac;">${item.registre}</td>
+                    <td style="font-weight:bold; font-size:1.1em; color:#e5ecff;">${displayValue}</td>
                     <td><span class="pill ${statusClass}">${statusText}</span></td>
                 `;
                 
+                // Clic pour voir les détails
+                tr.style.cursor = "pointer";
                 tr.onclick = () => updateDetail(item, displayValue);
                 tbody.appendChild(tr);
             });
 
-            // KPIs
+            // Mise à jour des compteurs (KPI)
             document.getElementById("sum-active").textContent = activeCount;
             document.getElementById("sum-warn").textContent = warnCount;
             document.getElementById("sum-err").textContent = errCount;
-            document.getElementById("sum-rate").textContent = activeCount * (60/5) * 60; 
 
         } catch (e) {
-            console.error("Serveur déconnecté ou erreur:", e);
+            console.error("Serveur déconnecté:", e);
             
-            // --- C'EST ICI QUE ÇA CHANGE L'AFFICHAGE ---
-            
-            // 1. Changer le badge en haut
+            // Affichage Mode HORS LIGNE
             badge.textContent = "Backend OFF";
-            badge.style.backgroundColor = "#ff4b4b"; // Rouge
+            badge.style.backgroundColor = "#ff4b4b"; 
             
-            // 2. Vider le tableau et afficher un message clair
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align:center; padding: 20px;">
+                    <td colspan="5" style="text-align:center; padding: 20px;">
                         <span style="color: #ff4b4b; font-weight: bold; font-size: 1.2em;">
-                            ⚠️ CONNEXION AU SERVEUR PERDUE ⚠️
+                            ⚠️ CONNEXION PERDUE ⚠️
                         </span><br>
-                        <small style="color: #888;">Vérifiez que le backend Node.js est lancé.</small>
+                        <small style="color: #888;">Le serveur Node.js ne répond pas.</small>
                     </td>
                 </tr>
             `;
-
-            // 3. Réinitialiser les KPIs à zéro ou tirets
+            // Reset KPIs
             document.getElementById("sum-active").textContent = "-";
             document.getElementById("sum-warn").textContent = "-";
             document.getElementById("sum-err").textContent = "-";
         }
     }
-    
-    // Mise à jour Détails
+
+    // Affichage détail (Carte de droite)
     function updateDetail(item, displayValue) {
-    document.getElementById("rt-var-name").textContent = item.nom;
-    document.getElementById("rt-value").textContent = displayValue;
-
-    if(item.timestamp) {
-        const dateObj = new Date(item.timestamp);
-        document.getElementById("rt-timestamp").textContent = "à " + dateObj.toLocaleTimeString();
-    } else {
-        document.getElementById("rt-timestamp").textContent = "--:--:--";
+        document.getElementById("rt-var-name").textContent = item.nom;
+        document.getElementById("rt-value").textContent = displayValue;
+        
+        if(item.timestamp) {
+            const dateObj = new Date(item.timestamp);
+            document.getElementById("rt-timestamp").textContent = dateObj.toLocaleTimeString();
+        } else {
+            document.getElementById("rt-timestamp").textContent = "--:--:--";
+        }
     }
-
-    // --- Envoi au graphe ---
-    if (!isNaN(displayValue)) {
-        startRealtime(parseFloat(displayValue));
-    }
-}
-
 
     // Déconnexion
     async function logout() {
-        try {
-            await fetch("http://localhost:3000/api/auth/logout", { 
-                method: "POST",
-                credentials: "include"
-            });
-        } catch(e) {}
+        try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch(e) {}
         localStorage.removeItem("loggedIn");
         window.location.href = "login.html";
     }
 
-    // Lancer la boucle
+    // Lancer la boucle (toutes les 2 secondes)
     setInterval(updateDashboard, 2000);
-    updateDashboard(); // Immédiat
+    updateDashboard(); // Premier appel immédiat
 
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="realtime.js"></script>
-
 
 </body>
 </html>
