@@ -446,3 +446,38 @@ body, html {
     padding-top: 10px;
     text-align: right;
 }
+/* --- STYLE DU BLOC ANALOGIQUE --- */
+#analog-options {
+    background-color: rgba(255, 255, 255, 0.03); /* Fond sombre transparent */
+    border: 1px dashed var(--bordure);           /* Bordure discrète */
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+.options-header {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.opt-title {
+    color: var(--bleu);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.opt-info {
+    color: var(--texte-gris);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+/* On s'assure que les labels dans ce bloc ne collent pas trop */
+#analog-options label {
+    margin-top: 0;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+}

@@ -95,32 +95,49 @@
                 <option value="boolean">TOR (Marche/Arrêt - 0 ou 1)</option>
             </select>
 
-            <div id="analog-options" style="background: #f0f4ff; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #dbeafe;">
-                
-                <label style="color: #1a73e8; font-weight: bold;">Position de la virgule (Décimales)</label>
-                <p style="font-size: 0.8em; color: #666; margin-top: -5px; margin-bottom: 5px;">
-                    Exemple : Si l'automate envoie 1234
-                </p>
-                <select id="var-decimals">
-                    <option value="0">0 décimale (Valeur = 1234)</option>
-                    <option value="1">1 décimale (Valeur = 123.4)</option>
-                    <option value="2" selected>2 décimales (Valeur = 12.34)</option>
-                    <option value="3">3 décimales (Valeur = 1.234)</option>
-                </select>
+           <div id="analog-options">
+    <div class="options-header">
+        <span class="opt-title">Format & Unité</span>
+        <span class="opt-info">(Ex: 1234 reçu de l'automate)</span>
+    </div>
 
-                <label style="color: #1a73e8; font-weight: bold; margin-top: 10px;">Unité d'affichage</label>
-                <select id="var-unit">
-                    <option value="">Aucune</option>
-                    <option value="°C">°C (Degré Celsius)</option>
-                    <option value="%">% (Pourcentage)</option>
-                    <option value="bar">bar (Pression)</option>
-                    <option value="Hz">Hz (Fréquence)</option>
-                    <option value="A">A (Ampère)</option>
-                    <option value="V">V (Volt)</option>
-                    <option value="rpm">rpm (Tours/min)</option>
-                    <option value="m³">m³ (Volume)</option>
-                </select>
-            </div>
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+            <label>Décimales</label>
+            <select id="var-decimals">
+                <option value="0">0 (Entier : 1234)</option>
+                <option value="1">1 (Une décimale : 123.4)</option>
+                <option value="2" selected>2 (Deux décimales : 12.34)</option>
+                <option value="3">3 (Trois décimales : 1.234)</option>
+            </select>
+        </div>
+        <div style="flex: 1;">
+            <label>Unité</label>
+            <select id="var-unit">
+                <option value="">Aucune</option>
+                <option value="°C">°C</option>
+                <option value="%">%</option>
+                <option value="bar">bar</option>
+                <option value="Hz">Hz</option>
+                <option value="A">A</option>
+                <option value="V">V</option>
+                <option value="rpm">rpm</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="options-header">
+        <span class="opt-title" style="color: var(--rouge);">Seuils d'alerte</span>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+            <input type="number" id="var-min" placeholder="Min (Alerte basse)">
+        </div>
+        <div style="flex: 1;">
+            <input type="number" id="var-max" placeholder="Max (Alerte haute)">
+        </div>
+    </div>
+</div>
 
             <div style="display: flex; gap: 10px;">
                 <div style="flex:1">
@@ -222,6 +239,8 @@
         isEditing = false;
         document.getElementById("form-title").innerText = "Ajouter une variable";
         document.getElementById("var-id").value = "";
+        document.getElementById("var-min").value = "";
+        document.getElementById("var-max").value = "";
         
         // Reset des champs
         document.getElementById("var-nom").value = "";
@@ -242,6 +261,8 @@
         isEditing = true;
         document.getElementById("form-title").innerText = "Modifier : " + variable.nom;
         document.getElementById("var-id").value = variable.id;
+        document.getElementById("var-min").value = variable.seuil_min;
+        document.getElementById("var-max").value = variable.seuil_max;
 
         // Remplissage des champs
         document.getElementById("var-nom").value = variable.nom;
