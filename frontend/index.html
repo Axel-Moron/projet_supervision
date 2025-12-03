@@ -1,29 +1,16 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supervision – Variables process</title>
-    <link rel="stylesheet" href="style-dashboard.css">
+    <link rel="stylesheet" href="style-dashboard.css?v=1.2">
 
-    <script>
-        // Sécurité : Si pas connecté, retour au login
-        if (localStorage.getItem("loggedIn") !== "true") {
-            window.location.href = "login.html";
-        }
-    </script>
-
-    <style>
-        /* Styles spécifiques au Switch Mode (Simu/Réel) */
-        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #2ecc71; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #ff4b4b; } /* Rouge quand Simu */
-        input:checked + .slider:before { transform: translateX(16px); }
-        
-        /* Badge Backend */
-        #backend-badge { transition: background-color 0.3s; }
-    </style>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="auth.js"></script>
+    <script src="realtime.js"></script>
 </head>
 
 <body class="dash-body">
@@ -50,15 +37,16 @@
                 <h1>Supervision des variables process</h1>
                 <p>État en temps réel de l'installation</p>
             </div>
-            
+
             <div class="topbar-right">
-                <div class="topbar-badges" style="display: flex; align-items: center; gap: 10px;">
+                <div class="topbar-badges">
                     <span id="backend-badge" class="badge badge-ok">Backend OK</span>
-                    
-                    <div style="display:flex; align-items:center; background:#0b172d; padding:4px 10px; border-radius:15px; border:1px solid #1c2844;">
-                        <span id="mode-label" style="font-size:10px; margin-right:8px; color:#2ecc71; font-weight:bold;">MODBUS RÉEL</span>
+
+                    <div class="mode-container">
+                        <span id="mode-label" class="mode-label">MODBUS RÉEL</span>
                         <label class="switch">
-                            <input type="checkbox" id="mode-switch" onchange="toggleMode()">
+                            <input type="checkbox" id="mode-switch" name="mode-switch" onchange="toggleMode()"
+                                aria-label="Basculer entre mode réel et simulation">
                             <span class="slider round"></span>
                         </label>
                     </div>
@@ -75,7 +63,7 @@
 
             <section class="card vars-card">
                 <h2>Variables surveillées</h2>
-                
+
                 <table class="vars-table">
                     <thead>
                         <tr>
@@ -87,7 +75,9 @@
                         </tr>
                     </thead>
                     <tbody id="vars-body">
-                        <tr><td colspan="5" style="text-align:center;">Connexion au serveur...</td></tr>
+                        <tr>
+                            <td colspan="5" class="empty-message">Connexion au serveur...</td>
+                        </tr>
                     </tbody>
                 </table>
             </section>
@@ -104,8 +94,8 @@
                         <span class="rt-timestamp" id="rt-timestamp">--:--:--</span>
                     </div>
                 </div>
-                <div class="trend-placeholder" style="display:flex; align-items:center; justify-content:center; color:#666;">
-                    <span>(Graphique temps réel à venir)</span>
+                <div class="trend-placeholder">
+                    <canvas id="realtimeChart"></canvas>
                 </div>
             </section>
 
@@ -131,201 +121,209 @@
 
     </div>
 
-<script>
-    const API_URL = "http://localhost:3000/api";
+    <script>
+        const API_URL = "http://localhost:3000/api";
 
-    // 1. Horloge
-    function updateClock() {
-        const now = new Date();
-        document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
-        document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // 2. Gestion du Switch Mode (Simu / Réel)
-    async function toggleMode() {
-        const isSimu = document.getElementById("mode-switch").checked;
-        updateSwitchVisuals(isSimu);
-        try {
-            await fetch(`${API_URL}/mode`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ simulation: isSimu })
-            });
-        } catch(e) { console.error("Erreur switch mode", e); }
-    }
-
-    function updateSwitchVisuals(isSimu) {
-        const label = document.getElementById("mode-label");
-        if(isSimu) {
-            label.textContent = "SIMULATION";
-            label.style.color = "#ff4b4b"; // Rouge
-        } else {
-            label.textContent = "MODBUS RÉEL";
-            label.style.color = "#2ecc71"; // Vert
+        // 1. Horloge
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
+            document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
         }
-    }
+        setInterval(updateClock, 1000);
+        updateClock();
 
-    // 3. Boucle principale (Rafraîchissement Dashboard)
-    async function updateDashboard() {
-        const badge = document.getElementById("backend-badge");
-        const tbody = document.getElementById("vars-body");
+        // 2. Gestion du Switch Mode (Simu / Réel)
+        async function toggleMode() {
+            const isSimu = document.getElementById("mode-switch").checked;
+            updateSwitchVisuals(isSimu);
+            try {
+                await fetch(`${API_URL}/mode`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ simulation: isSimu })
+                });
+            } catch (e) { console.error("Erreur switch mode", e); }
+        }
 
-        try {
-            // A. Vérification connexion (Timeout court 1s)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 1000);
-
-            // On vérifie le mode en premier pour voir si le backend répond
-            const resMode = await fetch(`${API_URL}/mode`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            const dataMode = await resMode.json();
-
-            // Si on est là, le backend est VIVANT
-            if(badge.textContent !== "Backend OK") {
-                badge.textContent = "Backend OK";
-                badge.style.backgroundColor = "#2ecc71"; 
+        function updateSwitchVisuals(isSimu) {
+            const label = document.getElementById("mode-label");
+            if (isSimu) {
+                label.textContent = "SIMULATION";
+                label.style.color = "#ff4b4b"; // Rouge
+            } else {
+                label.textContent = "MODBUS RÉEL";
+                label.style.color = "#2ecc71"; // Vert
             }
+        }
 
-            // Synchro du bouton switch si besoin
-            const checkbox = document.getElementById("mode-switch");
-            if (checkbox.checked !== dataMode.mode) {
-                checkbox.checked = dataMode.mode;
-                updateSwitchVisuals(dataMode.mode);
-            }
+        // 3. Boucle principale (Rafraîchissement Dashboard)
+        async function updateDashboard() {
+            const badge = document.getElementById("backend-badge");
+            const tbody = document.getElementById("vars-body");
 
-            // B. Récupération des données Dashboard
-            const response = await fetch(`${API_URL}/dashboard`);
-            const data = await response.json();
-            
-            tbody.innerHTML = ""; 
+            try {
+                // A. Vérification connexion (Timeout court 1s)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 1000);
 
-            let activeCount = 0;
-            let warnCount = 0;
-            let errCount = 0;
+                // On vérifie le mode en premier pour voir si le backend répond
+                const resMode = await fetch(`${API_URL}/mode`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                const dataMode = await resMode.json();
 
-            if(data.length === 0) {
-                 tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Aucune variable active.</td></tr>`;
-            }
-
-            // C. Boucle sur chaque variable
-            data.forEach(item => {
-                activeCount++;
-                
-                let displayValue = "";
-                let statusClass = "ok";
-                let statusText = "OK";
-
-                // Cas 1 : Erreur de communication ou valeur nulle
-                if (item.valeur === null || item.valeur === -1) {
-                    displayValue = "ERREUR";
-                    statusClass = "err";
-                    statusText = "TIMEOUT";
-                    errCount++;
-                }
-                // Cas 2 : Booléen (TOR)
-                else if (item.type === "boolean") {
-                    if (item.valeur == 1) {
-                        displayValue = "MARCHE (1)";
-                        statusClass = "ok";
-                    } else {
-                        displayValue = "ARRÊT (0)";
-                        statusClass = "warn"; // Ou gris
-                        statusText = "OFF";
-                    }
-                } 
-                // Cas 3 : Analogique (Nombre)
-                else {
-                    let val = parseFloat(item.valeur);
-                    
-                    // Formatage (Décimales + Unité)
-                    displayValue = val.toFixed(item.decimals || 0);
-                    if(item.unit) displayValue += " " + item.unit;
-
-                    // --- LOGIQUE DES SEUILS (ALERTE) ---
-                    if (item.seuil_max !== null && val > item.seuil_max) {
-                        statusClass = "err";   // Rouge
-                        statusText = "HAUT";
-                        warnCount++;
-                    }
-                    else if (item.seuil_min !== null && val < item.seuil_min) {
-                        statusClass = "warn";  // Orange
-                        statusText = "BAS";
-                        warnCount++;
-                    }
+                // Si on est là, le backend est VIVANT
+                if (badge.textContent !== "Backend OK") {
+                    badge.textContent = "Backend OK";
+                    badge.style.backgroundColor = "#2ecc71";
                 }
 
-                // Création de la ligne HTML
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
+                // Synchro du bouton switch si besoin
+                const checkbox = document.getElementById("mode-switch");
+                if (checkbox.checked !== dataMode.mode) {
+                    checkbox.checked = dataMode.mode;
+                    updateSwitchVisuals(dataMode.mode);
+                }
+
+                // B. Récupération des données Dashboard
+                const response = await fetch(`${API_URL}/dashboard`);
+                const data = await response.json();
+
+                tbody.innerHTML = "";
+
+                let activeCount = 0;
+                let warnCount = 0;
+                let errCount = 0;
+
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="empty-message">Aucune variable active.</td></tr>`;
+                }
+
+                // C. Boucle sur chaque variable
+                data.forEach(item => {
+                    activeCount++;
+
+                    let displayValue = "";
+                    let statusClass = "ok";
+                    let statusText = "OK";
+
+                    // Cas 1 : Erreur de communication ou valeur nulle
+                    if (item.valeur === null || item.valeur === -1) {
+                        displayValue = "ERREUR";
+                        statusClass = "err";
+                        statusText = "TIMEOUT";
+                        errCount++;
+                    }
+                    // Cas 2 : Booléen (TOR)
+                    else if (item.type === "boolean") {
+                        if (item.valeur == 1) {
+                            displayValue = "MARCHE (1)";
+                            statusClass = "ok";
+                        } else {
+                            displayValue = "ARRÊT (0)";
+                            statusClass = "warn"; // Ou gris
+                            statusText = "OFF";
+                        }
+                    }
+                    // Cas 3 : Analogique (Nombre)
+                    else {
+                        let val = parseFloat(item.valeur);
+
+                        // Formatage (Décimales + Unité)
+                        displayValue = val.toFixed(item.decimals || 0);
+                        if (item.unit) displayValue += " " + item.unit;
+
+                        // --- LOGIQUE DES SEUILS (ALERTE) ---
+                        if (item.seuil_max !== null && val > item.seuil_max) {
+                            statusClass = "err";   // Rouge
+                            statusText = "HAUT";
+                            warnCount++;
+                        }
+                        else if (item.seuil_min !== null && val < item.seuil_min) {
+                            statusClass = "warn";  // Orange
+                            statusText = "BAS";
+                            warnCount++;
+                        }
+                    }
+
+                    // Création de la ligne HTML
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
                     <td style="font-weight:bold;">${item.nom}</td>
                     <td style="color:#8899ac;">${item.ip}</td>
                     <td style="color:#8899ac;">${item.registre}</td>
                     <td style="font-weight:bold; font-size:1.1em; color:#e5ecff;">${displayValue}</td>
                     <td><span class="pill ${statusClass}">${statusText}</span></td>
                 `;
-                
-                // Clic pour voir les détails
-                tr.style.cursor = "pointer";
-                tr.onclick = () => updateDetail(item, displayValue);
-                tbody.appendChild(tr);
-            });
 
-            // Mise à jour des compteurs (KPI)
-            document.getElementById("sum-active").textContent = activeCount;
-            document.getElementById("sum-warn").textContent = warnCount;
-            document.getElementById("sum-err").textContent = errCount;
+                    // Clic pour voir les détails
+                    tr.style.cursor = "pointer";
+                    tr.onclick = () => updateDetail(item, displayValue);
+                    tbody.appendChild(tr);
+                });
 
-        } catch (e) {
-            console.error("Serveur déconnecté:", e);
-            
-            // Affichage Mode HORS LIGNE
-            badge.textContent = "Backend OFF";
-            badge.style.backgroundColor = "#ff4b4b"; 
-            
-            tbody.innerHTML = `
+                // Mise à jour des compteurs (KPI)
+                document.getElementById("sum-active").textContent = activeCount;
+                document.getElementById("sum-warn").textContent = warnCount;
+                document.getElementById("sum-err").textContent = errCount;
+
+            } catch (e) {
+                console.error("Serveur déconnecté:", e);
+
+                // Affichage Mode HORS LIGNE
+                badge.textContent = "Backend OFF";
+                badge.style.backgroundColor = "#ff4b4b";
+
+                tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align:center; padding: 20px;">
-                        <span style="color: #ff4b4b; font-weight: bold; font-size: 1.2em;">
+                    <td colspan="5" class="empty-message">
+                        <span class="error-message">
                             ⚠️ CONNEXION PERDUE ⚠️
                         </span><br>
-                        <small style="color: #888;">Le serveur Node.js ne répond pas.</small>
+                        <small class="error-subtext">Le serveur Node.js ne répond pas.</small>
                     </td>
                 </tr>
             `;
-            // Reset KPIs
-            document.getElementById("sum-active").textContent = "-";
-            document.getElementById("sum-warn").textContent = "-";
-            document.getElementById("sum-err").textContent = "-";
+                // Reset KPIs
+                document.getElementById("sum-active").textContent = "-";
+                document.getElementById("sum-warn").textContent = "-";
+                document.getElementById("sum-err").textContent = "-";
+            }
         }
-    }
 
-    // Affichage détail (Carte de droite)
-    function updateDetail(item, displayValue) {
-        document.getElementById("rt-var-name").textContent = item.nom;
-        document.getElementById("rt-value").textContent = displayValue;
-        
-        if(item.timestamp) {
-            const dateObj = new Date(item.timestamp);
-            document.getElementById("rt-timestamp").textContent = dateObj.toLocaleTimeString();
-        } else {
-            document.getElementById("rt-timestamp").textContent = "--:--:--";
+        // Affichage détail (Carte de droite)
+        function updateDetail(item, displayValue) {
+            document.getElementById("rt-var-name").textContent = item.nom;
+            document.getElementById("rt-value").textContent = displayValue;
+
+            if (item.timestamp) {
+                const dateObj = new Date(item.timestamp);
+                document.getElementById("rt-timestamp").textContent = dateObj.toLocaleTimeString();
+
+                // Mise à jour du graphique
+                if (window.updateRealtimeChart) {
+                    const val = parseFloat(item.valeur);
+                    if (!isNaN(val)) {
+                        window.updateRealtimeChart(item.id, val, item.timestamp);
+                    }
+                }
+            } else {
+                document.getElementById("rt-timestamp").textContent = "--:--:--";
+            }
         }
-    }
 
-    // Déconnexion
-    async function logout() {
-        try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch(e) {}
-        localStorage.removeItem("loggedIn");
-        window.location.href = "login.html";
-    }
+        // Déconnexion
+        async function logout() {
+            try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch (e) { }
+            localStorage.removeItem("loggedIn");
+            window.location.href = "login.html";
+        }
 
-    // Lancer la boucle (toutes les 2 secondes)
-    setInterval(updateDashboard, 2000);
-    updateDashboard(); // Premier appel immédiat
-
-</script>
+        // Lancer la boucle (toutes les 2 secondes)
+        setInterval(updateDashboard, 2000);
+        updateDashboard(); // Premier appel immédiat
+    </script>
 
 </body>
+
 </html>

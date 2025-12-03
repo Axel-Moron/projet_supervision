@@ -1,347 +1,330 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
-    <title>Paramétrage des variables</title>
-    <link rel="stylesheet" href="style-dashboard.css">
-
-    <script>
-        // Sécurité : redirection si non connecté
-        if (localStorage.getItem("loggedIn") !== "true") {
-            window.location.href = "login.html";
-        }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervision – Paramétrage</title>
+    <link rel="stylesheet" href="style-dashboard.css?v=1.2">
+    <script src="auth.js"></script>
 </head>
 
 <body class="dash-body">
 
-<aside class="sidebar">
-    <div class="sidebar-logo">
-        <span class="sidebar-logo-icon">🧰</span>
-        <span class="sidebar-logo-text">SUPERVISION</span>
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="sidebar-logo-icon">🧰</span>
+            <span class="sidebar-logo-text">SUPERVISION</span>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="index.html" class="sidebar-item">📊 <span>Temps réel</span></a>
+            <a href="config.html" class="sidebar-item active">⚙️ <span>Paramétrage</span></a>
+            <a href="historique.html" class="sidebar-item">📅 <span>Historique</span></a>
+        </nav>
+
+        <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
+    </aside>
+
+    <div class="main-layout">
+
+        <header class="topbar">
+            <div>
+                <h1>Configuration</h1>
+                <p>Gérez les variables automates</p>
+            </div>
+
+            <div class="topbar-right">
+                <!-- Username injected by auth.js -->
+                <div class="topbar-clock">
+                    <span id="clock-time">--:--</span>
+                    <span id="clock-date">--/--/----</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="config-container">
+
+            <section class="card">
+                <div class="config-header">
+                    <h2>Liste des variables</h2>
+                    <button class="btn-add" onclick="checkAdminAccess() && openForm()">+ Ajouter une variable</button>
+                </div>
+
+                <table class="vars-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>IP</th>
+                            <th>Registre</th>
+                            <th>Type</th>
+                            <th>Unité</th>
+                            <th>Freq.</th>
+                            <th>Actif</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="config-body">
+                        <!-- Rempli par JS -->
+                    </tbody>
+                </table>
+            </section>
+
+        </main>
+
     </div>
 
-    <nav class="sidebar-menu">
-        <a href="index.html" class="sidebar-item">📊 <span>Temps réel</span></a>
-        <a href="config.html" class="sidebar-item active">⚙️ <span>Paramétrage</span></a>
-        <a href="historique.html" class="sidebar-item">📅 <span>Historique</span></a>
-    </nav>
+    <!-- MODAL FORMULAIRE -->
+    <div id="form-card">
+        <div class="modal-content">
+            <h2 id="form-title" class="modal-title">Ajouter une variable</h2>
 
-    <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
-</aside>
+            <input type="hidden" id="var-id">
 
-<div class="main-layout">
+            <label for="var-nom">Nom de la variable</label>
+            <input type="text" id="var-nom" name="var-nom" placeholder="Ex: Température Four">
 
-    <header class="topbar">
-        <div>
-            <h1>Paramétrage des variables</h1>
-            <p>Ajoute, modifie ou supprime des variables à superviser</p>
-        </div>
-        <div class="topbar-clock">
-            <span id="clock-time">--:--</span>
-            <span id="clock-date">--/--/----</span>
-        </div>
-    </header>
-
-    <main class="config-container">
-
-        <section class="card config-card">
-            <h2>Liste des variables</h2>
-
-            <table class="vars-table">
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th>IP automate</th>
-                        <th>Registre</th>
-                        <th>Format</th> <th>Unité</th>  <th>Fréq.</th>
-                        <th>Actif</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-
-                <tbody id="config-body">
-                    <tr><td colspan="8" style="text-align:center;">Chargement des données...</td></tr>
-                </tbody>
-            </table>
-
-            <div class="config-footer">
-                <button class="btn-add" onclick="openForm()">➕ Ajouter une variable</button>
-            </div>
-        </section>
-
-        <section class="card form-card" id="form-card" style="display:none;">
-            <h2 id="form-title">Ajouter une variable</h2>
-            
-            <input type="hidden" id="var-id"> 
-
-            <label>Nom de la variable</label>
-            <input type="text" id="var-nom" placeholder="Ex: Température Four">
-
-            <div style="display: flex; gap: 10px;">
-                <div style="flex:1">
-                    <label>IP automate</label>
-                    <input type="text" id="var-ip" placeholder="192.168.0.10">
+            <div class="form-row">
+                <div class="form-col">
+                    <label for="var-ip">IP automate</label>
+                    <input type="text" id="var-ip" name="var-ip" placeholder="172.16.1.">
                 </div>
-                <div style="flex:1">
-                    <label>Registre (%MW)</label>
-                    <input type="number" id="var-registre" placeholder="Ex: 40001">
+                <div class="form-col">
+                    <label for="var-registre">Registre (%MW)</label>
+                    <input type="number" id="var-registre" name="var-registre" placeholder="Ex: 40001">
                 </div>
             </div>
 
-            <label>Type de donnée</label>
-            <select id="var-type" onchange="toggleAnalogOptions()">
+            <label for="var-type">Type de donnée</label>
+            <select id="var-type" name="var-type" onchange="toggleAnalogOptions()" class="form-select">
                 <option value="float">Analogique (Valeur numérique)</option>
                 <option value="boolean">TOR (Marche/Arrêt - 0 ou 1)</option>
             </select>
 
-           <div id="analog-options">
-    <div class="options-header">
-        <span class="opt-title">Format & Unité</span>
-        <span class="opt-info">(Ex: 1234 reçu de l'automate)</span>
-    </div>
-
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-        <div style="flex: 1;">
-            <label>Décimales</label>
-            <select id="var-decimals">
-                <option value="0">0 (Entier : 1234)</option>
-                <option value="1">1 (Une décimale : 123.4)</option>
-                <option value="2" selected>2 (Deux décimales : 12.34)</option>
-                <option value="3">3 (Trois décimales : 1.234)</option>
-            </select>
-        </div>
-        <div style="flex: 1;">
-            <label>Unité</label>
-            <select id="var-unit">
-                <option value="">Aucune</option>
-                <option value="°C">°C</option>
-                <option value="%">%</option>
-                <option value="bar">bar</option>
-                <option value="Hz">Hz</option>
-                <option value="A">A</option>
-                <option value="V">V</option>
-                <option value="rpm">rpm</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="options-header">
-        <span class="opt-title" style="color: var(--rouge);">Seuils d'alerte</span>
-    </div>
-    <div style="display: flex; gap: 10px;">
-        <div style="flex: 1;">
-            <input type="number" id="var-min" placeholder="Min (Alerte basse)">
-        </div>
-        <div style="flex: 1;">
-            <input type="number" id="var-max" placeholder="Max (Alerte haute)">
-        </div>
-    </div>
-</div>
-
-            <div style="display: flex; gap: 10px;">
-                <div style="flex:1">
-                    <label>Fréquence (sec)</label>
-                    <input type="number" id="var-freq" value="5" min="1">
+            <div id="analog-options">
+                <div class="analog-options-row">
+                    <div class="form-col">
+                        <label for="var-decimals">Décimales</label>
+                        <select id="var-decimals" name="var-decimals" class="form-select">
+                            <option value="0">0 (Entier)</option>
+                            <option value="1">1 (123.4)</option>
+                            <option value="2" selected>2 (12.34)</option>
+                            <option value="3">3 (1.234)</option>
+                        </select>
+                    </div>
+                    <div class="form-col">
+                        <label for="var-unit">Unité</label>
+                        <select id="var-unit" name="var-unit" class="form-select">
+                            <option value="">Aucune</option>
+                            <option value="°C">°C</option>
+                            <option value="%">%</option>
+                            <option value="bar">bar</option>
+                            <option value="Hz">Hz</option>
+                            <option value="A">A</option>
+                            <option value="V">V</option>
+                            <option value="rpm">rpm</option>
+                        </select>
+                    </div>
                 </div>
-                <div style="flex:1">
-                    <label>Actif</label>
-                    <select id="var-actif">
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <label for="var-min">Seuil Min</label>
+                        <input type="number" id="var-min" name="var-min" placeholder="Alerte basse">
+                    </div>
+                    <div class="form-col">
+                        <label for="var-max">Seuil Max</label>
+                        <input type="number" id="var-max" name="var-max" placeholder="Alerte haute">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col">
+                    <label for="var-freq">Fréquence (sec)</label>
+                    <input type="number" id="var-freq" name="var-freq" value="5" min="1">
+                </div>
+                <div class="form-col">
+                    <label for="var-actif">Actif</label>
+                    <select id="var-actif" name="var-actif" class="form-select">
                         <option value="1">Oui</option>
                         <option value="0">Non</option>
                     </select>
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
-        <div style="flex:1">
-            <label style="color: #d35400;">Seuil Min (Alerte basse)</label>
-            <input type="number" id="var-min" placeholder="Ex: 10">
-        </div>
-        <div style="flex:1">
-            <label style="color: #c0392b;">Seuil Max (Alerte haute)</label>
-            <input type="number" id="var-max" placeholder="Ex: 80">
-        </div>
-    </div>
 
             <div class="form-buttons">
                 <button class="btn-save" onclick="saveVariable()">💾 Enregistrer</button>
                 <button class="btn-cancel" onclick="closeForm()">Annuler</button>
             </div>
-        </section>
+        </div>
+    </div>
 
-    </main>
-</div>
+    <script>
+        const API_URL = "http://localhost:3000/api";
+        let isEditing = false;
 
-<script>
-    const API_URL = "http://localhost:3000/api";
-    let isEditing = false; // Variable pour savoir si on est en mode Modification
+        // Chargement initial
+        loadVariables();
 
-    // Chargement initial
-    loadVariables();
+        // Horloge
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
+            document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
 
-    // Horloge
-    function updateClock() {
-        const now = new Date();
-        document.getElementById('clock-time').textContent = now.toLocaleTimeString('fr-FR');
-        document.getElementById('clock-date').textContent = now.toLocaleDateString('fr-FR');
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+        // Afficher/Masquer les options décimales/unités
+        function toggleAnalogOptions() {
+            const type = document.getElementById("var-type").value;
+            const optionsDiv = document.getElementById("analog-options");
+            optionsDiv.style.display = (type === "float") ? "block" : "none";
+        }
 
-    // Afficher/Masquer les options décimales/unités
-    function toggleAnalogOptions() {
-        const type = document.getElementById("var-type").value;
-        const optionsDiv = document.getElementById("analog-options");
-        optionsDiv.style.display = (type === "float") ? "block" : "none";
-    }
+        // --- 1. Charger et afficher les variables ---
+        async function loadVariables() {
+            try {
+                const response = await fetch(`${API_URL}/variables`);
+                const variables = await response.json();
+                const tbody = document.getElementById("config-body");
+                tbody.innerHTML = "";
 
-    // --- 1. Charger et afficher les variables ---
-    async function loadVariables() {
-        try {
-            const response = await fetch(`${API_URL}/variables`);
-            const variables = await response.json();
-            const tbody = document.getElementById("config-body");
-            tbody.innerHTML = ""; 
+                if (variables.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-message">Aucune variable configurée.</td></tr>';
+                    return;
+                }
 
-            if(variables.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Aucune variable configurée.</td></tr>';
-                return;
+                variables.forEach(v => {
+                    const jsonVar = JSON.stringify(v).replace(/'/g, "&#39;");
+
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${v.nom}</td>
+                        <td>${v.ip_automate}</td>
+                        <td>${v.registre}</td>
+                        <td>${v.type === 'float' ? (v.decimals > 0 ? '/ 10^' + v.decimals : 'Entier') : '-'}</td>
+                        <td>${v.unit || '-'}</td>
+                        <td>${v.frequence}s</td>
+                        <td><span class="pill ${v.actif ? 'ok' : 'err'}">${v.actif ? 'ON' : 'OFF'}</span></td>
+                        <td>
+                            <button class="btn-small btn-edit" onclick='checkAdminAccess() && editVar(${jsonVar})'>Modifier</button>
+                            <button class="btn-small btn-delete" onclick="checkAdminAccess() && deleteVar(${v.id})">Supprimer</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error("Erreur chargement:", e);
+            }
+        }
+
+        // --- 2. Ouvrir le formulaire en mode AJOUT ---
+        function openForm() {
+            isEditing = false;
+            document.getElementById("form-title").innerText = "Ajouter une variable";
+            document.getElementById("var-id").value = "";
+
+            // Reset des champs
+            document.getElementById("var-nom").value = "";
+            document.getElementById("var-ip").value = "172.16.1.";
+            document.getElementById("var-registre").value = "";
+            document.getElementById("var-type").value = "float";
+            document.getElementById("var-decimals").value = "2";
+            document.getElementById("var-unit").value = "";
+            document.getElementById("var-min").value = "";
+            document.getElementById("var-max").value = "";
+            document.getElementById("var-freq").value = "5";
+            document.getElementById("var-actif").value = "1";
+
+            toggleAnalogOptions();
+            document.getElementById("form-card").style.display = "flex";
+        }
+
+        // --- 3. Ouvrir le formulaire en mode MODIFICATION ---
+        function editVar(variable) {
+            isEditing = true;
+            document.getElementById("form-title").innerText = "Modifier : " + variable.nom;
+            document.getElementById("var-id").value = variable.id;
+
+            // Remplissage des champs
+            document.getElementById("var-nom").value = variable.nom;
+            document.getElementById("var-ip").value = variable.ip_automate;
+            document.getElementById("var-registre").value = variable.registre;
+            document.getElementById("var-type").value = variable.type;
+            document.getElementById("var-freq").value = variable.frequence;
+            document.getElementById("var-actif").value = variable.actif ? "1" : "0";
+            document.getElementById("var-decimals").value = variable.decimals || 0;
+            document.getElementById("var-unit").value = variable.unit || "";
+            document.getElementById("var-min").value = variable.seuil_min;
+            document.getElementById("var-max").value = variable.seuil_max;
+
+            toggleAnalogOptions();
+            document.getElementById("form-card").style.display = "flex";
+        }
+
+        // --- 4. Sauvegarder ---
+        async function saveVariable() {
+            const id = document.getElementById("var-id").value;
+
+            const data = {
+                nom: document.getElementById("var-nom").value,
+                ip_automate: document.getElementById("var-ip").value,
+                registre: document.getElementById("var-registre").value,
+                type: document.getElementById("var-type").value,
+                frequence: document.getElementById("var-freq").value,
+                actif: document.getElementById("var-actif").value === "1",
+                decimals: document.getElementById("var-decimals").value,
+                unit: document.getElementById("var-unit").value,
+                seuil_min: document.getElementById("var-min").value,
+                seuil_max: document.getElementById("var-max").value
+            };
+
+            let url = `${API_URL}/variables`;
+            let method = "POST";
+
+            if (isEditing && id) {
+                url = `${API_URL}/variables/${id}`;
+                method = "PUT";
             }
 
-            variables.forEach(v => {
-                // Astuce pour passer l'objet complet au bouton modifier
-                // On remplace les guillemets simples pour éviter de casser le HTML
-                const jsonVar = JSON.stringify(v).replace(/'/g, "&#39;");
+            try {
+                const resp = await fetch(url, {
+                    method: method,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                });
 
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${v.nom}</td>
-                    <td>${v.ip_automate}</td>
-                    <td>${v.registre}</td>
-                    <td>${v.type === 'float' ? (v.decimals > 0 ? '/ 10^'+v.decimals : 'Entier') : '-'}</td>
-                    <td>${v.unit || '-'}</td>
-                    <td>${v.frequence}s</td>
-                    <td><span class="pill ${v.actif ? 'ok' : 'err'}">${v.actif ? 'ON' : 'OFF'}</span></td>
-                    <td>
-                        <button class="btn-small edit-btn" onclick='editVar(${jsonVar})'>Modifier</button>
-                        <button class="btn-small delete-btn" onclick="deleteVar(${v.id})">Supprimer</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        } catch (e) {
-            console.error("Erreur chargement:", e);
-        }
-    }
-
-    // --- 2. Ouvrir le formulaire en mode AJOUT ---
-    function openForm() {
-        isEditing = false;
-        document.getElementById("form-title").innerText = "Ajouter une variable";
-        document.getElementById("var-id").value = "";
-        document.getElementById("var-min").value = "";
-        document.getElementById("var-max").value = "";
-        
-        // Reset des champs
-        document.getElementById("var-nom").value = "";
-        document.getElementById("var-ip").value = "192.168.0.10";
-        document.getElementById("var-registre").value = "";
-        document.getElementById("var-type").value = "float";
-        document.getElementById("var-decimals").value = "2";
-        document.getElementById("var-unit").value = "";
-        document.getElementById("var-freq").value = "5";
-        document.getElementById("var-actif").value = "1";
-        
-        toggleAnalogOptions(); // Mise à jour affichage
-        document.getElementById("form-card").style.display = "flex";
-    }
-
-    // --- 3. Ouvrir le formulaire en mode MODIFICATION ---
-    function editVar(variable) {
-        isEditing = true;
-        document.getElementById("form-title").innerText = "Modifier : " + variable.nom;
-        document.getElementById("var-id").value = variable.id;
-        document.getElementById("var-min").value = variable.seuil_min;
-        document.getElementById("var-max").value = variable.seuil_max;
-
-        // Remplissage des champs
-        document.getElementById("var-nom").value = variable.nom;
-        document.getElementById("var-ip").value = variable.ip_automate;
-        document.getElementById("var-registre").value = variable.registre;
-        document.getElementById("var-type").value = variable.type;
-        document.getElementById("var-freq").value = variable.frequence;
-        document.getElementById("var-actif").value = variable.actif ? "1" : "0";
-        
-        // Champs optionnels
-        document.getElementById("var-decimals").value = variable.decimals || 0;
-        document.getElementById("var-unit").value = variable.unit || "";
-
-        toggleAnalogOptions(); // Mise à jour affichage
-        document.getElementById("form-card").style.display = "flex";
-    }
-
-    // --- 4. Sauvegarder (Gère Création ET Modification) ---
-    async function saveVariable() {
-        const id = document.getElementById("var-id").value;
-        
-        const data = {
-            nom: document.getElementById("var-nom").value,
-            ip_automate: document.getElementById("var-ip").value,
-            registre: document.getElementById("var-registre").value,
-            type: document.getElementById("var-type").value,
-            frequence: document.getElementById("var-freq").value,
-            actif: document.getElementById("var-actif").value === "1",
-            decimals: document.getElementById("var-decimals").value,
-            unit: document.getElementById("var-unit").value,
-            seuil_min: document.getElementById("var-min").value,
-            seuil_max: document.getElementById("var-max").value
-        };
-
-        let url = `${API_URL}/variables`;
-        let method = "POST";
-
-        // Si on a un ID, c'est une modification -> PUT
-        if (isEditing && id) {
-            url = `${API_URL}/variables/${id}`;
-            method = "PUT";
-        }
-
-        try {
-            const resp = await fetch(url, {
-                method: method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data)
-            });
-            
-            if(resp.ok) {
-                closeForm();
-                loadVariables(); // Rafraîchir le tableau
-            } else {
-                alert("Erreur lors de la sauvegarde");
+                if (resp.ok) {
+                    closeForm();
+                    loadVariables();
+                } else {
+                    alert("Erreur lors de la sauvegarde");
+                }
+            } catch (e) {
+                console.error(e);
             }
-        } catch (e) {
-            console.error(e);
         }
-    }
 
-    // --- 5. Supprimer ---
-    async function deleteVar(id) {
-        if(!confirm("Voulez-vous vraiment supprimer cette variable ?")) return;
-        try {
-            await fetch(`${API_URL}/variables/${id}`, { method: "DELETE" });
-            loadVariables();
-        } catch (e) { console.error(e); }
-    }
+        // --- 5. Supprimer ---
+        async function deleteVar(id) {
+            if (!confirm("Voulez-vous vraiment supprimer cette variable ?")) return;
+            try {
+                await fetch(`${API_URL}/variables/${id}`, { method: "DELETE" });
+                loadVariables();
+            } catch (e) { console.error(e); }
+        }
 
-    // --- 6. Utilitaires ---
-    function closeForm() { document.getElementById("form-card").style.display = "none"; }
-    
-    async function logout() {
-        try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch(e) {}
-        localStorage.removeItem("loggedIn");
-        window.location.href = "login.html";
-    }
-</script>
+        function closeForm() { document.getElementById("form-card").style.display = "none"; }
+
+        async function logout() {
+            try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch (e) { }
+            localStorage.removeItem("loggedIn");
+            window.location.href = "login.html";
+        }
+    </script>
 
 </body>
+
 </html>

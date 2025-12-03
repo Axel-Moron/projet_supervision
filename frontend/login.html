@@ -1,79 +1,179 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion</title>
-    <link rel="stylesheet" href="style-login.css">
+    <link rel="stylesheet" href="style-login.css?v=1.2">
 </head>
 
 <body class="login-body">
 
-<div class="login-card">
+    <div class="login-card">
 
-    <div class="top-banner">
-        <!-- TON LOGO DANS LE BANDEAU -->
-        <img src="Images_Icones/user_bleu_vide.png" class="banner-logo" alt="Logo">
+        <div class="top-banner">
+            <!-- TON LOGO DANS LE BANDEAU -->
+            <img src="Images_Icones/user_bleu_vide.png" class="banner-logo" alt="Logo">
+        </div>
+
+        <!-- FORMULAIRE DE CONNEXION -->
+        <div id="login-form">
+            <h2 class="connexion">Connexion</h2>
+
+            <div class="input-group">
+                <span class="icon">👤</span>
+                <input type="text" id="username" placeholder="Identifiant" aria-label="Identifiant">
+            </div>
+
+            <div class="input-group">
+                <span class="icon">🔒</span>
+                <input type="password" id="password" placeholder="Mot de passe" aria-label="Mot de passe">
+            </div>
+
+            <button class="submit-btn" id="loginBtn">Se connecter</button>
+
+            <div class="toggle-container">
+                <button class="toggle-btn" onclick="toggleForms()">Créer un compte</button>
+            </div>
+        </div>
+
+        <!-- FORMULAIRE D'INSCRIPTION -->
+        <div id="register-form">
+            <h2 class="connexion">Nouveau Compte</h2>
+
+            <div class="input-group">
+                <span class="icon">👤</span>
+                <input type="text" id="reg-username" placeholder="Nouvel Identifiant" aria-label="Nouvel Identifiant">
+            </div>
+            <div class="input-group">
+                <span class="icon">🔒</span>
+                <input type="password" id="reg-password" placeholder="Nouveau Mot de passe"
+                    aria-label="Nouveau Mot de passe">
+            </div>
+
+            <div class="admin-validation">
+                <h4>Validation Administrateur</h4>
+                <div class="input-group">
+                    <span class="icon">🛡️</span>
+                    <input type="text" id="admin-username" placeholder="Admin Login" aria-label="Admin Login">
+                </div>
+                <div class="input-group">
+                    <span class="icon">🔑</span>
+                    <input type="password" id="admin-password" placeholder="Admin Password" aria-label="Admin Password">
+                </div>
+                <div class="admin-checkbox-container">
+                    <label class="admin-checkbox-label">
+                        <input type="checkbox" id="is-admin-check"> Compte Administrateur ?
+                    </label>
+                </div>
+            </div>
+
+            <button class="submit-btn submit-btn-register" id="registerBtn">Créer le compte</button>
+
+            <div class="toggle-container">
+                <button class="toggle-btn" onclick="toggleForms()">Retour à la connexion</button>
+            </div>
+        </div>
+
+        <!-- Message d’erreur -->
+        <p id="loginMessage"></p>
+
     </div>
 
-    <h2 class="connexion">Connexion</h2>
+    <script>
+        const API_URL = "http://localhost:3000/api/auth";
 
-    <!-- Identifiant -->
-    <div class="input-group">
-        <span class="icon">👤</span>
-        <input type="text" id="username" placeholder="Identifiant">
-    </div>
+        function toggleForms() {
+            const loginForm = document.getElementById("login-form");
+            const registerForm = document.getElementById("register-form");
+            const msg = document.getElementById("loginMessage");
 
-    <!-- Mot de passe -->
-    <div class="input-group">
-        <span class="icon">🔒</span>
-        <input type="password" id="password" placeholder="Mot de passe">
-    </div>
+            if (loginForm.style.display === "none") {
+                loginForm.style.display = "block";
+                registerForm.style.display = "none";
+            } else {
+                loginForm.style.display = "none";
+                registerForm.style.display = "block";
+            }
+            msg.textContent = ""; // Clear messages
+        }
 
-    <!-- Bouton -->
-    <button class="submit-btn" id="loginBtn">Se connecter</button>
+        // CONNEXION
+        document.getElementById("loginBtn").addEventListener("click", async () => {
+            const user = document.getElementById("username").value;
+            const pass = document.getElementById("password").value;
 
-    <!-- Message d’erreur -->
-    <p id="loginMessage"></p>
+            if (!user || !pass) return showMessage("Veuillez remplir tous les champs");
 
-</div>
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: user, password: pass }),
+                    credentials: "include"
+                });
 
-<script>
-const API_URL = "http://localhost:3000/api/auth";
+                const data = await response.json();
 
-document.getElementById("loginBtn").addEventListener("click", async () => {
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
-    const messageBox = document.getElementById("loginMessage");
-
-    try {
-        const response = await fetch(`${API_URL}/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: user, password: pass }),
-            credentials: "include" // TRES IMPORTANT : Permet de garder la session (cookie)
+                if (response.ok && data.success) {
+                    localStorage.setItem("loggedIn", "true");
+                    window.location.href = "index.html";
+                } else {
+                    showMessage(data.error || "Erreur de connexion");
+                }
+            } catch (err) {
+                console.error(err);
+                showMessage("Impossible de contacter le serveur");
+            }
         });
 
-        const data = await response.json();
+        // INSCRIPTION
+        document.getElementById("registerBtn").addEventListener("click", async () => {
+            const user = document.getElementById("reg-username").value;
+            const pass = document.getElementById("reg-password").value;
+            const adminUser = document.getElementById("admin-username").value;
+            const adminPass = document.getElementById("admin-password").value;
+            const isAdmin = document.getElementById("is-admin-check").checked;
 
-        if (response.ok && data.success) {
-            // On stocke juste un marqueur visuel, mais la vraie sécurité est dans le cookie session
-            localStorage.setItem("loggedIn", "true"); 
-            window.location.href = "index.html";
-        } else {
-            showMessage(data.error || "Erreur de connexion");
+            if (!user || !pass || !adminUser || !adminPass) {
+                return showMessage("Tous les champs sont obligatoires");
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: user,
+                        password: pass,
+                        adminUsername: adminUser,
+                        adminPassword: adminPass,
+                        isAdmin: isAdmin
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showMessage("Compte créé ! Vous pouvez vous connecter.", "green");
+                    setTimeout(() => toggleForms(), 1500);
+                } else {
+                    showMessage(data.error || "Erreur lors de la création");
+                }
+            } catch (err) {
+                console.error(err);
+                showMessage("Impossible de contacter le serveur");
+            }
+        });
+
+        function showMessage(msg, color = "red") {
+            const m = document.getElementById("loginMessage");
+            m.textContent = msg;
+            m.style.color = color;
         }
-    } catch (err) {
-        console.error(err);
-        showMessage("Impossible de contacter le serveur");
-    }
-});
-
-function showMessage(msg) {
-    const m = document.getElementById("loginMessage");
-    m.textContent = msg;
-    m.style.color = "red";
-}
-</script>
+    </script>
 
 </body>
+
 </html>

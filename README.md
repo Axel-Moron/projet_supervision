@@ -100,13 +100,33 @@ Tu peux :
 
 ---
 
+## 🐳 Déploiement Docker (Requis pour le Hackathon)
+
+1.  **Prérequis** : Avoir Docker et Docker Compose installés.
+2.  **Lancement** :
+    À la racine du projet (là où se trouve `docker-compose.yml`), lance la commande :
+    ```bash
+    docker-compose up --build
+    ```
+3.  **Accès** :
+    -   **Frontend** : `http://localhost:8080`
+    -   **Backend** : `http://localhost:3000`
+    -   **Base de données** : Port `3307` (User: root, Pass: admin)
+
+### 🌐 Accès depuis le réseau local
+Pour accéder à l'application depuis un autre PC :
+1.  Récupère l'IP de ton PC serveur (ex: `ipconfig` -> `192.168.1.25`).
+2.  Sur l'autre PC, ouvre le navigateur : `http://192.168.1.25:8080`.
+
+---
+
 ## 🗺️ Roadmap
 
-- Ajouter un mode simulation complet  
-- Ajouter l’export Excel avec mise en forme  
-- Ajouter une authentification avancée  
-- Ajouter des graphiques temps réel  
-- Ajouter un dark/light mode  
+- [x] Mode simulation
+- [x] Tâches dynamiques (node-cron)
+- [x] Export CSV
+- [ ] Authentification avancée (JWT)
+- [ ] Dark/Light mode  
 
 ---
 

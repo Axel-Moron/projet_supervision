@@ -14,6 +14,7 @@
     "express-session": "^1.18.2",
     "mariadb": "^3.3.0",
     "modbus-serial": "^8.0.23",
+    "node-cron": "^4.2.1",
     "sequelize": "^6.37.3",
     "sqlite3": "^5.1.7"
   },

@@ -1,5 +1,6 @@
 // --- INITIALISATION CHART ---
 let chart;
+let currentVarId = null;
 
 function createChart() {
     const ctx = document.getElementById("realtimeChart").getContext("2d");
@@ -13,31 +14,57 @@ function createChart() {
                 data: [],
                 borderWidth: 2,
                 borderColor: "#4fc3f7",
-                pointRadius: 0,
-                tension: 0.2
+                backgroundColor: "rgba(79, 195, 247, 0.1)",
+                pointRadius: 2,
+                tension: 0.2,
+                fill: true
             }]
         },
         options: {
             animation: false,
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
+                x: {
+                    ticks: { color: '#8899ac' },
+                    grid: { color: '#1c2844' }
+                },
                 y: {
-                    beginAtZero: false
+                    beginAtZero: false,
+                    ticks: { color: '#8899ac' },
+                    grid: { color: '#1c2844' }
                 }
+            },
+            plugins: {
+                legend: { labels: { color: '#e5ecff' } }
             }
         }
     });
 }
 
 // --- FONCTION POUR AJOUTER VALEURS ---
-async function updateChart(value) {
+function updateChart(variableId, value, timestamp) {
     if (!chart) createChart();
 
-    chart.data.labels.push(new Date().toLocaleTimeString());
+    // Si on change de variable, on reset le graph
+    if (currentVarId !== variableId) {
+        currentVarId = variableId;
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+    }
+
+    const timeLabel = new Date(timestamp).toLocaleTimeString();
+
+    // Eviter les doublons de temps si update trop rapide
+    if (chart.data.labels.length > 0 && chart.data.labels[chart.data.labels.length - 1] === timeLabel) {
+        return;
+    }
+
+    chart.data.labels.push(timeLabel);
     chart.data.datasets[0].data.push(value);
 
-    // Garder seulement les 120 derniers points (2 minutes)
-    if (chart.data.labels.length > 120) {
+    // Garder seulement les 60 derniers points
+    if (chart.data.labels.length > 60) {
         chart.data.labels.shift();
         chart.data.datasets[0].data.shift();
     }
@@ -45,7 +72,5 @@ async function updateChart(value) {
     chart.update();
 }
 
-// --- LIER AU CLICK D’UNE VARIABLE ---
-window.startRealtime = function(value) {
-    updateChart(value); // Ajout immédiat
-};
+// --- EXPORT GLOBAL ---
+window.updateRealtimeChart = updateChart;

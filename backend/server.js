@@ -2,9 +2,10 @@ import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import session from "express-session";
-import mariadb from "mariadb"; 
+import mariadb from "mariadb";
 import sequelize from "./config/db.js";
-import ModbusRTU from "modbus-serial"; // <--- NOUVEAU
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Modèles
 import Variable from "./models/Variable.js";
@@ -15,16 +16,14 @@ import User from "./models/User.js";
 import apiRoutes from "./routes/api.js";
 import authRoutes from "./routes/auth.js";
 
+// Services
+import { initScheduler } from "./services/scheduler.js";
+import { setSimulationMode, getSimulationMode } from "./services/modbusService.js";
+
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// --- VARIABLE GLOBALE D'ÉTAT ---
-let MODE_SIMULATION = false; // Par défaut on simule pas
-
-// Fonction pour faire une pause
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-// ... (Configuration BDD autoConfigDB identique, je ne la remets pas pour raccourcir, garde la tienne) ...
-// ... Si tu as besoin je peux la remettre, mais c'est la fonction autoConfigDB() d'avant ...
-// Pour faire simple, copie-colle la fonction autoConfigDB() de ton ancien fichier ici.
 async function autoConfigDB() {
     let conn;
     try {
@@ -37,7 +36,7 @@ async function autoConfigDB() {
         await conn.query("CREATE OR REPLACE USER 'db_user'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('strong_password')");
         await conn.query("GRANT ALL PRIVILEGES ON supervision.* TO 'db_user'@'localhost'");
         await conn.query("FLUSH PRIVILEGES");
-    } catch (err) { console.error(err.message); } 
+    } catch (err) { console.error(err.message); }
     finally { if (conn) conn.end(); }
 }
 
@@ -50,107 +49,44 @@ app.use(session({
     cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// --- SERVIR LE FRONTEND ---
+app.use(express.static(path.join(__dirname, '../frontend')));
+
 app.use("/api", apiRoutes);
 app.use("/api/auth", authRoutes);
 
-// --- NOUVELLE ROUTE POUR LE SWITCH ---
+// --- ROUTE MODE SIMULATION ---
 app.post("/api/mode", (req, res) => {
     const { simulation } = req.body;
     if (typeof simulation === 'boolean') {
-        MODE_SIMULATION = simulation;
-        console.log(`🔄 Mode changé : ${MODE_SIMULATION ? "SIMULATION" : "RÉEL"}`);
-        res.json({ success: true, mode: MODE_SIMULATION });
+        setSimulationMode(simulation);
+        res.json({ success: true, mode: getSimulationMode() });
     } else {
         res.status(400).json({ error: "Valeur booléenne attendue" });
     }
 });
 app.get("/api/mode", (req, res) => {
-    res.json({ mode: MODE_SIMULATION });
+    res.json({ mode: getSimulationMode() });
 });
-
-// --- FONCTION LECTURE RÉELLE MODBUS CORRIGÉE ---
-const lireModbusReel = async (variables) => {
-    const now = new Date();
-    
-    for (const v of variables) {
-        const client = new ModbusRTU();
-        try {
-            // Connexion (inchangée)
-            await client.connectTCP(v.ip_automate, { port: 502 });
-            client.setID(1);
-            client.setTimeout(2000);
-
-            const addr = parseInt(v.registre); 
-            let val;
-
-
-            if (v.type === "boolean") {
-            const data = await client.readCoils(addr, 1);
-            val = data.data[0] ? 1 : 0;
-              } else {
-            // Lecture d'un MOT (%MW)
-            const data = await client.readHoldingRegisters(addr, 1);
-            let rawValue = data.data[0];
-
-            // --- NOUVEAU CALCUL AVEC DÉCIMALES ---
-            // Si decimals = 2, on divise par 10 puissance 2 (100)
-            const divisor = Math.pow(10, v.decimals || 0); 
-            val = rawValue / divisor;
-}
-
-            console.log(`✅ Succès ${v.nom} : ${val}`);
-            await Mesure.create({ variable_id: v.id, valeur: val, timestamp: now });
-
-        } catch (error) {
-            if(error.code !== 'ETIMEDOUT') {
-                console.error(`❌ Erreur Modbus sur ${v.ip_automate} (Var: ${v.nom}) :`, error.message);
-            }
-            
-            await Mesure.create({ 
-                variable_id: v.id, 
-                valeur: -1, 
-                timestamp: now 
-            });
-
-        } finally {
-            try { await client.close(); } catch(e) {}
-            // Pause pour éviter de saturer l'automate
-            await sleep(500); 
-        }
-    }
-};
-
-// --- SIMULATION ---
-const simulerAutomates = async (variables) => {
-    const now = new Date();
-    variables.forEach(async (v) => {
-        let randomValue;
-        if (v.type === "boolean") randomValue = Math.random() < 0.5 ? 0 : 1; 
-        else randomValue = (Math.random() * 100).toFixed(2);
-
-        await Mesure.create({ variable_id: v.id, valeur: randomValue, timestamp: now });
-    });
-};
-
-// --- BOUCLE PRINCIPALE ---
-setInterval(async () => {
-    try {
-        const variables = await Variable.findAll({ where: { actif: true } });
-        
-        if (MODE_SIMULATION) {
-            await simulerAutomates(variables);
-        } else {
-            await lireModbusReel(variables);
-        }
-    } catch (e) { console.error(e); }
-}, 5000);
 
 // --- DEMARRAGE ---
 const startServer = async () => {
     await autoConfigDB();
     await sequelize.sync({ alter: true });
-    const adminExists = await User.findOne({ where: { username: "admin" } });
-    if (!adminExists) await User.create({ username: "admin", password: "1234" });
+
+    // Création Admin par défaut
+    const adminUser = await User.findOne({ where: { username: "admin" } });
+    if (!adminUser) {
+        await User.create({ username: "admin", password: "1234", isAdmin: true });
+        console.log("👤 Admin user created");
+    } else if (!adminUser.isAdmin) {
+        adminUser.isAdmin = true;
+        await adminUser.save();
+        console.log("👤 Admin user updated to have admin rights");
+    }
+
+    // Démarrage du Scheduler
+    await initScheduler();
 
     app.listen(3000, () => console.log(`🚀 Serveur démarré sur http://localhost:3000`));
 };

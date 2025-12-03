@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=database
+      - DB_USER=root
+      - DB_PASSWORD=admin
+      - DB_NAME=supervision
+    depends_on:
+      - database
+    networks:
+      - supervision-network
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "8080:80"
+    networks:
+      - supervision-network
+
+  database:
+    image: mariadb:latest
+    environment:
+      - MARIADB_ROOT_PASSWORD=admin
+      - MARIADB_DATABASE=supervision
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - supervision-network
+
+networks:
+  supervision-network:
+    driver: bridge
+
+volumes:
+  db_data:

@@ -1,7 +1,8 @@
 import express from "express";
-import { Op } from "sequelize"; 
+import { Op } from "sequelize";
 import Variable from "../models/Variable.js";
 import Mesure from "../models/Mesure.js";
+import { refreshVariableTask, stopTask } from "../services/scheduler.js";
 
 const router = express.Router();
 
@@ -26,11 +27,14 @@ router.post("/variables", async (req, res) => {
             type,
             frequence,
             actif,
-            decimals: decimals || 0, 
-            unit: unit || "" ,
+            decimals: decimals || 0,
+            unit: unit || "",
             seuil_min: seuil_min !== "" ? seuil_min : null,
             seuil_max: seuil_max !== "" ? seuil_max : null
         });
+
+        // Démarrage de la tâche
+        await refreshVariableTask(variable.id);
 
         res.json(variable);
     } catch (e) {
@@ -41,6 +45,7 @@ router.post("/variables", async (req, res) => {
 router.delete("/variables/:id", async (req, res) => {
     try {
         await Variable.destroy({ where: { id: req.params.id } });
+        stopTask(req.params.id); // Arrêt de la tâche
         res.json({ message: "Supprimé" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -71,6 +76,10 @@ router.put("/variables/:id", async (req, res) => {
 
         // CORRECTION 2 : Une seule sauvegarde
         await variable.save();
+
+        // Mise à jour de la tâche planifiée
+        await refreshVariableTask(variable.id);
+
         res.json({ success: true, variable });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -88,7 +97,7 @@ router.get("/dashboard", async (req, res) => {
                 where: { variable_id: v.id },
                 order: [["timestamp", "DESC"]]
             });
-            
+
             dashboardData.push({
                 id: v.id,
                 nom: v.nom,
@@ -96,7 +105,7 @@ router.get("/dashboard", async (req, res) => {
                 registre: v.registre,
                 frequence: v.frequence,
                 type: v.type, // Utile pour le frontend
-                
+
                 // CORRECTION 3 : Il faut renvoyer ces infos au frontend pour les alertes !
                 decimals: v.decimals,
                 unit: v.unit,
@@ -123,10 +132,10 @@ router.get("/history", async (req, res) => {
 
         if (start && end) {
             const startDate = new Date(start);
-            startDate.setHours(0,0,0,0);
-            
+            startDate.setHours(0, 0, 0, 0);
+
             const endDate = new Date(end);
-            endDate.setHours(23,59,59,999);
+            endDate.setHours(23, 59, 59, 999);
 
             whereClause.timestamp = {
                 [Op.between]: [startDate, endDate]
@@ -137,13 +146,63 @@ router.get("/history", async (req, res) => {
             where: whereClause,
             include: [{ model: Variable, attributes: ['nom'] }],
             order: [["timestamp", "DESC"]],
-            limit: 500 
+            limit: 500
         });
 
         res.json(mesures);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// --- EXPORT CSV ---
+router.get("/export", async (req, res) => {
+    try {
+        const { variable_id, start, end } = req.query;
+        const whereClause = {};
+
+        if (variable_id) {
+            whereClause.variable_id = variable_id;
+        }
+
+        if (start && end) {
+            const startDate = new Date(start);
+            startDate.setHours(0, 0, 0, 0);
+
+            const endDate = new Date(end);
+            endDate.setHours(23, 59, 59, 999);
+
+            whereClause.timestamp = {
+                [Op.between]: [startDate, endDate]
+            };
+        }
+
+        const mesures = await Mesure.findAll({
+            where: whereClause,
+            include: [{ model: Variable, attributes: ['nom'] }],
+            order: [["timestamp", "ASC"]]
+        });
+
+        // Génération du CSV
+        let csv = "Date;Heure;Variable;Valeur\r\n";
+
+        mesures.forEach(m => {
+            const dateObj = new Date(m.timestamp);
+            const date = dateObj.toLocaleDateString();
+            const time = dateObj.toLocaleTimeString();
+            const nom = m.Variable ? m.Variable.nom : "Inconnue";
+            // Remplacer le point par une virgule pour Excel si besoin, ici on garde le standard
+            csv += `${date};${time};${nom};${m.valeur}\r\n`;
+        });
+
+        res.header("Content-Type", "text/csv");
+        res.attachment("export_supervision.csv");
+        res.send(csv);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Erreur lors de l'export");
     }
 });
 
