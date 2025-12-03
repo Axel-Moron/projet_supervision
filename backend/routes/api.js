@@ -17,7 +17,6 @@ router.get("/variables", async (req, res) => {
 // Route pour CRÉER une nouvelle variable
 router.post("/variables", async (req, res) => {
     try {
-        // CORRECTION : On récupère bien tous les champs ici
         const { nom, ip_automate, registre, type, frequence, actif, decimals, unit, seuil_min, seuil_max } = req.body;
 
         const variable = await Variable.create({
@@ -54,7 +53,6 @@ router.delete("/variables/:id", async (req, res) => {
 router.put("/variables/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        // CORRECTION 1 : Ajout de seuil_min et seuil_max dans la récupération
         const { nom, ip_automate, registre, type, frequence, actif, decimals, unit, seuil_min, seuil_max } = req.body;
 
         const variable = await Variable.findByPk(id);
@@ -74,7 +72,6 @@ router.put("/variables/:id", async (req, res) => {
         variable.seuil_min = (seuil_min !== "") ? seuil_min : null;
         variable.seuil_max = (seuil_max !== "") ? seuil_max : null;
 
-        // CORRECTION 2 : Une seule sauvegarde
         await variable.save();
 
         // Mise à jour de la tâche planifiée
@@ -104,14 +101,11 @@ router.get("/dashboard", async (req, res) => {
                 ip: v.ip_automate,
                 registre: v.registre,
                 frequence: v.frequence,
-                type: v.type, // Utile pour le frontend
-
-                // CORRECTION 3 : Il faut renvoyer ces infos au frontend pour les alertes !
+                type: v.type,
                 decimals: v.decimals,
                 unit: v.unit,
                 seuil_min: v.seuil_min,
                 seuil_max: v.seuil_max,
-
                 valeur: lastMesure ? lastMesure.valeur : null,
                 timestamp: lastMesure ? lastMesure.timestamp : null
             });
@@ -127,15 +121,20 @@ router.get("/history", async (req, res) => {
         const whereClause = {};
 
         if (variable_id) {
-            whereClause.variable_id = variable_id;
+            if (variable_id.includes(',')) {
+                whereClause.variable_id = { [Op.in]: variable_id.split(',') };
+            } else {
+                whereClause.variable_id = variable_id;
+            }
         }
 
         if (start && end) {
-            const startDate = new Date(start);
-            startDate.setHours(0, 0, 0, 0);
+            // Si le format inclut "T" (ISO), on garde l'heure exacte, sinon on prend la journée entière
+            const startDate = start.includes('T') ? new Date(start) : new Date(start);
+            if (!start.includes('T')) startDate.setHours(0, 0, 0, 0);
 
-            const endDate = new Date(end);
-            endDate.setHours(23, 59, 59, 999);
+            const endDate = end.includes('T') ? new Date(end) : new Date(end);
+            if (!end.includes('T')) endDate.setHours(23, 59, 59, 999);
 
             whereClause.timestamp = {
                 [Op.between]: [startDate, endDate]
@@ -144,9 +143,9 @@ router.get("/history", async (req, res) => {
 
         const mesures = await Mesure.findAll({
             where: whereClause,
-            include: [{ model: Variable, attributes: ['nom'] }],
-            order: [["timestamp", "DESC"]],
-            limit: 500
+            include: [{ model: Variable, attributes: ['nom', 'type', 'seuil_min', 'seuil_max', 'unit'] }],
+            order: [["timestamp", "ASC"]], // Ordre chrono pour le graph
+            limit: 2000 // Augmenté pour les graphs
         });
 
         res.json(mesures);
@@ -163,15 +162,19 @@ router.get("/export", async (req, res) => {
         const whereClause = {};
 
         if (variable_id) {
-            whereClause.variable_id = variable_id;
+            if (variable_id.includes(',')) {
+                whereClause.variable_id = { [Op.in]: variable_id.split(',') };
+            } else {
+                whereClause.variable_id = variable_id;
+            }
         }
 
         if (start && end) {
-            const startDate = new Date(start);
-            startDate.setHours(0, 0, 0, 0);
+            const startDate = start.includes('T') ? new Date(start) : new Date(start);
+            if (!start.includes('T')) startDate.setHours(0, 0, 0, 0);
 
-            const endDate = new Date(end);
-            endDate.setHours(23, 59, 59, 999);
+            const endDate = end.includes('T') ? new Date(end) : new Date(end);
+            if (!end.includes('T')) endDate.setHours(23, 59, 59, 999);
 
             whereClause.timestamp = {
                 [Op.between]: [startDate, endDate]
@@ -192,7 +195,6 @@ router.get("/export", async (req, res) => {
             const date = dateObj.toLocaleDateString();
             const time = dateObj.toLocaleTimeString();
             const nom = m.Variable ? m.Variable.nom : "Inconnue";
-            // Remplacer le point par une virgule pour Excel si besoin, ici on garde le standard
             csv += `${date};${time};${nom};${m.valeur}\r\n`;
         });
 

@@ -756,3 +756,221 @@ input:checked+.slider:before {
     font-size: 0.8em;
     padding: 2px 8px;
 }
+
+/* ===========================================
+   MODAL ACCES REFUSE
+=========================================== */
+#access-denied-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.access-denied-content {
+    background: #081224;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    border: 1px solid #1c2844;
+    color: #e5ecff;
+}
+
+.access-denied-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.access-denied-title {
+    color: #ff4b4b;
+    margin-bottom: 10px;
+    margin-top: 0;
+}
+
+.access-denied-text {
+    color: #9aa7c7;
+    margin-bottom: 20px;
+}
+
+.btn-access-denied {
+    padding: 10px 25px;
+    background: #1b2c47;
+    color: #e5ecff;
+    border: 1px solid #1c2844;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-access-denied:hover {
+    background: #23406b;
+}
+
+
+/* ===========================================
+   QUICK RANGES
+=========================================== */
+.quick-ranges {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.quick-ranges .btn-small {
+    background: #1c2844;
+    border: 1px solid #2c3e50;
+    font-size: 11px;
+    padding: 5px 10px;
+}
+
+.quick-ranges .btn-small:hover {
+    background: #11c5ff;
+    color: #050b18;
+    border-color: #11c5ff;
+}
+
+
+/* ===========================================
+   HISTORIQUE PAGE STYLES
+=========================================== */
+.history-main-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+}
+
+.filter-var-select {
+    height: 100px;
+}
+
+.chart-container {
+    position: relative;
+    height: 350px;
+    width: 100%;
+}
+
+.table-scroll-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+
+.chart-card-height {
+    min-height: 400px;
+}
+
+
+/* ===========================================
+   DASHBOARD CONTROLS (Lint Fixes)
+=========================================== */
+.quick-ranges-dashboard {
+    margin-top: 10px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 5px;
+    display: flex;
+    /* Ensure flex is applied if not already by quick-ranges */
+}
+
+.btn-period {
+    background: #2c3e50;
+}
+
+.custom-period-container {
+    display: none;
+    margin-top: 10px;
+    justify-content: flex-end;
+    gap: 5px;
+    align-items: center;
+}
+
+.input-datetime {
+    padding: 4px;
+    border-radius: 4px;
+    border: 1px solid #2c3e50;
+    background: #0b1121;
+    color: white;
+}
+
+.separator-text {
+    color: #8899ac;
+}
+
+.btn-go {
+    background: #11c5ff;
+    color: #050b18;
+}
+
+
+/* ===========================================
+   JS GENERATED CONTENT (Lint Fixes)
+=========================================== */
+.var-name {
+    font-weight: bold;
+}
+
+.var-ip,
+.var-registre {
+    color: #8899ac;
+}
+
+.var-value {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #e5ecff;
+}
+
+
+/* ===========================================
+   MODAL WARNING
+=========================================== */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.warning-title {
+    color: #f39c12 !important;
+}
+
+.btn-warning-ok {
+    background: #f39c12;
+    color: #081224;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+
+.btn-warning-ok:hover {
+    background: #d68910;
+}
+
+.confirm-title {
+    color: #3498db !important;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}

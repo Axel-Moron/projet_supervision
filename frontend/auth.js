@@ -4,7 +4,8 @@
 const API_AUTH_URL = "http://localhost:3000/api/auth";
 
 // Variable globale pour stocker l'état admin
-let currentUser = {
+// Variable globale pour stocker l'état admin
+window.currentUser = {
     username: null,
     isAdmin: false
 };
@@ -16,8 +17,9 @@ async function fetchUser() {
         const data = await response.json();
 
         if (data.authenticated) {
-            currentUser.username = data.username;
-            currentUser.isAdmin = data.isAdmin;
+            console.log("DEBUG auth.js: User authenticated:", data.username, "IsAdmin:", data.isAdmin);
+            window.currentUser.username = data.username;
+            window.currentUser.isAdmin = data.isAdmin;
             updateUserHeader();
         } else {
             // Si pas connecté, redirection (sécurité supplémentaire)
@@ -47,22 +49,32 @@ function updateUserHeader() {
         }
     }
 
-    // Contenu : Icône + Nom + Badge Admin
+    // Contenu : Icône + Nom + Badge Admin + Logout
     userDisplay.innerHTML = `
         <span class="user-icon">👤</span>
-        <span>${currentUser.username}</span>
-        ${currentUser.isAdmin ? '<span class="pill ok user-admin-badge">ADMIN</span>' : ''}
+        <span>${window.currentUser.username}</span>
+        ${window.currentUser.isAdmin ? '<span class="pill ok user-admin-badge">ADMIN</span>' : ''}
+        <button onclick="logout()" style="margin-left: 15px; padding: 8px 15px; background: #ff4b4b; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 13px; font-weight: bold;">Déconnexion</button>
     `;
 }
 
+// Fonction de déconnexion globale
+async function logout() {
+    try { await fetch(`${API_AUTH_URL}/logout`, { method: "POST", credentials: "include" }); } catch (e) { }
+    localStorage.removeItem("loggedIn");
+    window.location.href = "login.html";
+}
+
 // Fonction pour vérifier les droits admin (utilisée par config.html)
-function checkAdminAccess() {
-    if (!currentUser.isAdmin) {
+// Fonction pour vérifier les droits admin (utilisée par config.html)
+window.checkAdminAccess = function () {
+    console.log("Checking admin access. IsAdmin:", window.currentUser.isAdmin);
+    if (!window.currentUser.isAdmin) {
         alert("⛔ ACCÈS REFUSÉ\n\nVous devez être administrateur pour effectuer cette action.");
         return false;
     }
     return true;
-}
+};
 
 // Lancer la récupération au chargement
 document.addEventListener('DOMContentLoaded', fetchUser);

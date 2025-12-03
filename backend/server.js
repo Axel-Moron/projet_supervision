@@ -29,8 +29,8 @@ async function autoConfigDB() {
     try {
         conn = await mariadb.createConnection({
             host: process.env.DB_HOST || "127.0.0.1",
-            user: "root",
-            password: "admin"
+            user: process.env.DB_USER || "root",
+            password: process.env.DB_PASSWORD || "admin"
         });
         await conn.query("CREATE DATABASE IF NOT EXISTS supervision");
         await conn.query("CREATE OR REPLACE USER 'db_user'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('strong_password')");
@@ -43,7 +43,7 @@ async function autoConfigDB() {
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(session({
-    secret: "secret_supervision_key",
+    secret: process.env.SESSION_SECRET || "secret_supervision_key",
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }
@@ -77,7 +77,7 @@ const startServer = async () => {
     // Création Admin par défaut
     const adminUser = await User.findOne({ where: { username: "admin" } });
     if (!adminUser) {
-        await User.create({ username: "admin", password: "1234", isAdmin: true });
+        await User.create({ username: "admin", password: process.env.ADMIN_PASSWORD || "1234", isAdmin: true });
         console.log("👤 Admin user created");
     } else if (!adminUser.isAdmin) {
         adminUser.isAdmin = true;
@@ -85,9 +85,10 @@ const startServer = async () => {
         console.log("👤 Admin user updated to have admin rights");
     }
 
+    const PORT = process.env.PORT || 3000;
     // Démarrage du Scheduler
     await initScheduler();
 
-    app.listen(3000, () => console.log(`🚀 Serveur démarré sur http://localhost:3000`));
+    app.listen(PORT, () => console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`));
 };
 startServer();

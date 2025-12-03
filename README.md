@@ -4,18 +4,20 @@ Ce projet permet de superviser en temps réel des variables provenant d’un aut
 
 ---
 
-## 📌 Description
+## 📌 Contexte et Objectifs
 
-Cette application permet :
+Ce projet a été réalisé dans le cadre d'un **Hackathon Industriel**. L'objectif est de développer une solution de **relevé de données process** open-source, flexible et indépendante des solutions propriétaires coûteuses.
 
-- De lire des registres Modbus en continu  
-- D’afficher les mesures en temps réel  
-- De gérer dynamiquement les variables à superviser  
-- De stocker les mesures dans une base de données MariaDB  
-- D’afficher un dashboard web moderne  
-- D’exporter les données au format CSV  
-- D’ajouter un mode simulation pour tests hors-ligne  
+### 🎯 Enjeux
+- **Indépendance technologique** : S'affranchir des licences coûteuses.
+- **Flexibilité** : Adapter le suivi aux besoins spécifiques de chaque installation.
+- **Déploiement rapide** : Une solution "clé en main" déployable en quelques minutes sur un réseau local.
 
+### 💡 Fonctionnalités Clés
+1.  **Paramétrage intuitif** : Configuration des automates (IP, variables, fréquence) via une interface web.
+2.  **Supervision Temps Réel** : Tableau de bord interactif avec graphiques dynamiques.
+3.  **Historique et Export** : Consultation des données passées et export CSV pour analyse.
+4.  **Architecture Modulaire** : Backend (Node.js), Frontend (Vanilla JS), BDD (MariaDB) conteneurisés avec Docker.
 ---
 
 ## 🚀 Technologies utilisées
@@ -34,7 +36,21 @@ Cette application permet :
 
 ---
 
-## 📦 Prérequis
+---
+ 
+ ## 🏗️ Architecture Technique
+ 
+ L'application est conçue autour de 3 services conteneurisés (Docker) :
+ 
+ 1.  **Frontend (Nginx)** : Sert l'interface utilisateur (HTML/CSS/JS) sur le port `8080`.
+ 2.  **Backend (Node.js)** : API REST qui gère la logique métier, la communication Modbus, et les tâches planifiées (Cron). Port `3000`.
+ 3.  **Base de Données (MariaDB)** : Stocke les configurations et l'historique des mesures. Port `3307`.
+ 
+ Les conteneurs communiquent entre eux via un réseau Docker dédié (`app-network`).
+ 
+ ---
+ 
+ ## 📦 Prérequis
 
 Avant de commencer, assure-toi d’avoir installé :
 
@@ -117,16 +133,6 @@ Tu peux :
 Pour accéder à l'application depuis un autre PC :
 1.  Récupère l'IP de ton PC serveur (ex: `ipconfig` -> `192.168.1.25`).
 2.  Sur l'autre PC, ouvre le navigateur : `http://192.168.1.25:8080`.
-
----
-
-## 🗺️ Roadmap
-
-- [x] Mode simulation
-- [x] Tâches dynamiques (node-cron)
-- [x] Export CSV
-- [ ] Authentification avancée (JWT)
-- [ ] Dark/Light mode  
 
 ---
 

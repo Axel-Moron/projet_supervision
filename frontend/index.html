@@ -5,12 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supervision – Variables process</title>
-    <link rel="stylesheet" href="style-dashboard.css?v=1.2">
+    <link rel="stylesheet" href="style-dashboard.css?v=1.5">
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="auth.js"></script>
-    <script src="realtime.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="auth.js?v=1.5"></script>
 </head>
 
 <body class="dash-body">
@@ -26,8 +27,6 @@
             <a href="config.html" class="sidebar-item">⚙️ <span>Paramétrage</span></a>
             <a href="historique.html" class="sidebar-item">📅 <span>Historique</span></a>
         </nav>
-
-        <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
     </aside>
 
     <div class="main-layout">
@@ -86,7 +85,7 @@
                 <div class="realtime-header">
                     <div>
                         <h2>Détails – <span id="rt-var-name">...</span></h2>
-                        <p>Sélectionnez une ligne dans le tableau</p>
+                        <p>Sélectionnez une ligne pour voir l'historique récent</p>
                     </div>
                     <div class="rt-current">
                         <span class="label">Dernière lecture</span>
@@ -94,6 +93,26 @@
                         <span class="rt-timestamp" id="rt-timestamp">--:--:--</span>
                     </div>
                 </div>
+
+                <!-- Quick Ranges for Dashboard -->
+                <div class="quick-ranges quick-ranges-dashboard">
+                    <button type="button" class="btn-small" onclick="loadHistoryForDashboard(5)">5 min</button>
+                    <button type="button" class="btn-small" onclick="loadHistoryForDashboard(10)">10 min</button>
+                    <button type="button" class="btn-small" onclick="loadHistoryForDashboard(60)">1 h</button>
+                    <button type="button" class="btn-small" onclick="loadHistoryForDashboard(240)">4 h</button>
+                    <button type="button" class="btn-small" onclick="loadHistoryForDashboard(1440)">24 h</button>
+                    <button type="button" class="btn-small btn-period" onclick="toggleCustomPeriod()">📅
+                        Période</button>
+                </div>
+
+                <!-- Custom Period Inputs (Hidden by default) -->
+                <div id="custom-period-container" class="custom-period-container">
+                    <input type="datetime-local" id="dash-start" class="input-datetime" aria-label="Date de début">
+                    <span class="separator-text">à</span>
+                    <input type="datetime-local" id="dash-end" class="input-datetime" aria-label="Date de fin">
+                    <button type="button" class="btn-small btn-go" onclick="loadCustomHistory()">Go</button>
+                </div>
+
                 <div class="trend-placeholder">
                     <canvas id="realtimeChart"></canvas>
                 </div>
@@ -121,8 +140,30 @@
 
     </div>
 
+    <!-- MODAL WARNING -->
+    <div id="warning-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="warning-title" aria-describedby="warning-text">
+        <div class="access-denied-content">
+            <div class="access-denied-icon">⚠️</div>
+            <h2 id="warning-title" class="access-denied-title warning-title">Attention</h2>
+            <p id="warning-text" class="access-denied-text">Message d'avertissement...</p>
+            <button type="button" onclick="closeWarning()" class="btn-access-denied btn-warning-ok">OK</button>
+        </div>
+    </div>
+
     <script>
         const API_URL = "http://localhost:3000/api";
+        let currentChart = null;
+        let selectedVarId = null;
+        let currentVarData = null; // Store variable info for chart thresholds
+
+        function showWarning(msg) {
+            document.getElementById("warning-text").textContent = msg;
+            document.getElementById("warning-modal").style.display = "flex";
+        }
+
+        function closeWarning() {
+            document.getElementById("warning-modal").style.display = "none";
+        }
 
         // 1. Horloge
         function updateClock() {
@@ -249,16 +290,24 @@
                     // Création de la ligne HTML
                     const tr = document.createElement("tr");
                     tr.innerHTML = `
-                    <td style="font-weight:bold;">${item.nom}</td>
-                    <td style="color:#8899ac;">${item.ip}</td>
-                    <td style="color:#8899ac;">${item.registre}</td>
-                    <td style="font-weight:bold; font-size:1.1em; color:#e5ecff;">${displayValue}</td>
+                    <td class="var-name">${item.nom}</td>
+                    <td class="var-ip">${item.ip}</td>
+                    <td class="var-registre">${item.registre}</td>
+                    <td class="var-value">${displayValue}</td>
                     <td><span class="pill ${statusClass}">${statusText}</span></td>
                 `;
 
                     // Clic pour voir les détails
                     tr.style.cursor = "pointer";
-                    tr.onclick = () => updateDetail(item, displayValue);
+                    if (selectedVarId === item.id) {
+                        tr.classList.add('row-selected');
+                    }
+                    tr.onclick = () => {
+                        selectedVarId = item.id;
+                        currentVarData = item; // Store for chart thresholds
+                        updateDetail(item, displayValue);
+                        loadHistoryForDashboard(60); // Default 1h
+                    };
                     tbody.appendChild(tr);
                 });
 
@@ -299,24 +348,157 @@
             if (item.timestamp) {
                 const dateObj = new Date(item.timestamp);
                 document.getElementById("rt-timestamp").textContent = dateObj.toLocaleTimeString();
-
-                // Mise à jour du graphique
-                if (window.updateRealtimeChart) {
-                    const val = parseFloat(item.valeur);
-                    if (!isNaN(val)) {
-                        window.updateRealtimeChart(item.id, val, item.timestamp);
-                    }
-                }
             } else {
                 document.getElementById("rt-timestamp").textContent = "--:--:--";
             }
         }
 
-        // Déconnexion
-        async function logout() {
-            try { await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }); } catch (e) { }
-            localStorage.removeItem("loggedIn");
-            window.location.href = "login.html";
+        // --- CHARGEMENT HISTORIQUE DASHBOARD ---
+        function toggleCustomPeriod() {
+            const container = document.getElementById("custom-period-container");
+            container.style.display = container.style.display === "flex" ? "none" : "flex";
+        }
+
+        async function loadCustomHistory() {
+            if (!selectedVarId) return;
+            const start = document.getElementById("dash-start").value;
+            const end = document.getElementById("dash-end").value;
+
+            if (!start || !end) {
+                showWarning("Veuillez sélectionner une date de début et de fin.");
+                return;
+            }
+
+            const query = new URLSearchParams({
+                variable_id: selectedVarId,
+                start: start,
+                end: end
+            });
+
+            try {
+                const res = await fetch(`${API_URL}/history?${query}`);
+                const data = await res.json();
+                renderDashboardChart(data);
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadHistoryForDashboard(minutes) {
+            if (!selectedVarId) return;
+
+            // Masquer le custom si on clique sur un bouton rapide
+            document.getElementById("custom-period-container").style.display = "none";
+
+            const end = new Date();
+            const start = new Date(end.getTime() - minutes * 60000);
+
+            const query = new URLSearchParams({
+                variable_id: selectedVarId,
+                start: start.toISOString(),
+                end: end.toISOString()
+            });
+
+            try {
+                const res = await fetch(`${API_URL}/history?${query}`);
+                const data = await res.json();
+                renderDashboardChart(data);
+            } catch (e) {
+                console.error("Erreur historique dashboard:", e);
+            }
+        }
+
+        function renderDashboardChart(data) {
+            const ctx = document.getElementById('realtimeChart').getContext('2d');
+
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            if (data.length === 0) return;
+
+            const labels = data.map(d => new Date(d.timestamp));
+            const values = data.map(d => d.valeur);
+
+            // Configuration de base
+            let config = {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: currentVarData ? currentVarData.nom : "Valeur",
+                        data: values,
+                        borderColor: '#11c5ff',
+                        backgroundColor: 'rgba(17, 197, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0, // Plus propre pour le dashboard
+                        pointHoverRadius: 4,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'minute',
+                                displayFormats: { minute: 'HH:mm' }
+                            },
+                            grid: { color: '#1c2844' },
+                            ticks: { color: '#9aa7c7', maxTicksLimit: 6 }
+                        },
+                        y: {
+                            grid: { color: '#1c2844' },
+                            ticks: { color: '#9aa7c7' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false } // Pas besoin de légende sur le dashboard
+                    }
+                }
+            };
+
+            // --- Spécifique TOR (Digital) ---
+            if (currentVarData && currentVarData.type === 'boolean') {
+                config.data.datasets[0].stepped = true;
+                config.options.scales.y.ticks.stepSize = 1;
+                config.options.scales.y.min = 0;
+                config.options.scales.y.max = 1.2;
+                config.options.scales.y.ticks.callback = function (value) {
+                    if (value === 0) return 'OFF';
+                    if (value === 1) return 'ON';
+                    return '';
+                };
+            }
+
+            // --- Spécifique Analogique (Seuils) ---
+            if (currentVarData && currentVarData.type === 'float') {
+                if (currentVarData.seuil_max) {
+                    config.data.datasets.push({
+                        label: 'Max',
+                        data: new Array(data.length).fill(currentVarData.seuil_max),
+                        borderColor: '#ff4b4b',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+                if (currentVarData.seuil_min) {
+                    config.data.datasets.push({
+                        label: 'Min',
+                        data: new Array(data.length).fill(currentVarData.seuil_min),
+                        borderColor: '#f39c12',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    });
+                }
+            }
+
+            currentChart = new Chart(ctx, config);
         }
 
         // Lancer la boucle (toutes les 2 secondes)

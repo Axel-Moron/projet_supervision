@@ -5,8 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supervision – Historique</title>
-    <link rel="stylesheet" href="style-dashboard.css?v=1.2">
-    <script src="auth.js"></script>
+    <link rel="stylesheet" href="style-dashboard.css?v=1.5">
+    <script src="auth.js?v=1.5"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Date Adapter for Chart.js (optional but good for time scales) -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 
 <body class="dash-body">
@@ -22,16 +27,14 @@
             <a href="config.html" class="sidebar-item">⚙️ <span>Paramétrage</span></a>
             <a href="historique.html" class="sidebar-item active">📅 <span>Historique</span></a>
         </nav>
-
-        <button class="sidebar-logout" onclick="logout()">Déconnexion</button>
     </aside>
 
     <div class="main-layout">
 
         <header class="topbar">
             <div>
-                <h1>Historique et Exports</h1>
-                <p>Consultez les anciennes mesures et exportez-les en CSV</p>
+                <h1>Historique et Visualisation</h1>
+                <p>Analysez les données passées avec des graphiques interactifs</p>
             </div>
 
             <div class="topbar-right">
@@ -43,132 +46,309 @@
             </div>
         </header>
 
-        <main class="config-container">
+        <main class="config-container history-main-layout">
 
+            <!-- FILTRES -->
             <section class="card form-card">
-                <h2>Filtres de recherche</h2>
+                <h2>Paramètres de recherche</h2>
                 <div class="filters-container">
 
                     <div class="filter-group-large">
-                        <label for="filter-var">Variable</label>
-                        <select id="filter-var" name="filter-var">
-                            <option value="">Toutes les variables</option>
+                        <label for="filter-var">Variables (Ctrl+Click pour plusieurs)</label>
+                        <select id="filter-var" name="filter-var" multiple class="filter-var-select">
+                            <!-- Options remplies par JS -->
                         </select>
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter-start">Date début</label>
-                        <input type="date" id="filter-start" name="filter-start">
+                        <label>Plage rapide</label>
+                        <div class="quick-ranges">
+                            <button class="btn-small" onclick="setRange(5)">5 min</button>
+                            <button class="btn-small" onclick="setRange(60)">1 h</button>
+                            <button class="btn-small" onclick="setRange(240)">4 h</button>
+                            <button class="btn-small" onclick="setRange(1440)">24 h</button>
+                            <button class="btn-small" onclick="setRange(10080)">1 Sem</button>
+                        </div>
                     </div>
 
                     <div class="filter-group">
-                        <label for="filter-end">Date fin</label>
-                        <input type="date" id="filter-end" name="filter-end">
+                        <label for="filter-start">Début</label>
+                        <input type="datetime-local" id="filter-start" name="filter-start">
                     </div>
 
-                    <button class="btn-search" onclick="searchData()">🔍 Rechercher</button>
-                    <button class="btn-export" onclick="exportCSV()">📥 Export CSV</button>
+                    <div class="filter-group">
+                        <label for="filter-end">Fin</label>
+                        <input type="datetime-local" id="filter-end" name="filter-end">
+                    </div>
+
+                    <button class="btn-search" onclick="searchData()">🔍 Afficher</button>
+                    <button class="btn-export" onclick="exportCSV()">📥 CSV</button>
                 </div>
             </section>
 
+            <!-- GRAPHIQUE -->
+            <section class="card chart-card-height">
+                <h2>Graphique</h2>
+                <div class="chart-container">
+                    <canvas id="historyChart"></canvas>
+                </div>
+            </section>
+
+            <!-- TABLEAU -->
             <section class="card config-card">
-                <h2>Résultats (<span id="res-count">0</span> mesures)</h2>
-                <table class="vars-table">
-                    <thead>
-                        <tr>
-                            <th>Date / Heure</th>
-                            <th>Variable</th>
-                            <th>Valeur</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-body">
-                        <tr>
-                            <td colspan="3" class="empty-message">Lancer une recherche...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h2>Données brutes (<span id="res-count">0</span> mesures)</h2>
+                <div class="table-scroll-container">
+                    <table class="vars-table">
+                        <thead>
+                            <tr>
+                                <th>Date / Heure</th>
+                                <th>Variable</th>
+                                <th>Valeur</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr>
+                                <td colspan="3" class="empty-message">Sélectionnez une variable et une plage de temps.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
         </main>
 
     </div>
 
+    <!-- MODAL WARNING (Remplaçant alert) -->
+    <div id="warning-modal" class="modal-overlay">
+
+        <div class="access-denied-content">
+            <div class="access-denied-icon">⚠️</div>
+            <h2 class="access-denied-title warning-title">Attention</h2>
+            <p id="warning-text" class="access-denied-text">Message d'avertissement...</p>
+            <button onclick="closeWarning()" class="btn-warning-ok">OK</button>
+
+        </div>
+    </div>
+
     <script>
         const API_URL = "http://localhost:3000/api";
-        let currentData = [];
+        let currentChart = null;
+        let variablesList = [];
 
-        // 1. Charger la liste des variables au démarrage
+        // --- 0. Gestion Modal Warning ---
+        function showWarning(msg) {
+            document.getElementById("warning-text").textContent = msg;
+            document.getElementById("warning-modal").style.display = "flex";
+        }
+
+        function closeWarning() {
+            document.getElementById("warning-modal").style.display = "none";
+        }
+
+        // --- 1. Initialisation ---
         async function loadVars() {
             try {
                 const res = await fetch(`${API_URL}/variables`);
-                const vars = await res.json();
+                variablesList = await res.json();
                 const select = document.getElementById("filter-var");
-                vars.forEach(v => {
+
+                variablesList.forEach(v => {
                     const opt = document.createElement("option");
                     opt.value = v.id;
                     opt.textContent = v.nom;
                     select.appendChild(opt);
                 });
 
-                // Dates par défaut (aujourd'hui)
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById("filter-start").value = today;
-                document.getElementById("filter-end").value = today;
+                // Par défaut : 1 heure
+                setRange(60);
             } catch (e) {
                 console.error("Erreur chargement variables:", e);
             }
         }
         loadVars();
 
-        // 2. Rechercher les données
+        // --- 2. Gestion des plages ---
+        function setRange(minutes) {
+            const end = new Date();
+            const start = new Date(end.getTime() - minutes * 60000);
+
+            // Format pour datetime-local: YYYY-MM-DDTHH:mm
+            const format = (d) => {
+                const pad = (n) => n < 10 ? '0' + n : n;
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+
+            document.getElementById("filter-end").value = format(end);
+            document.getElementById("filter-start").value = format(start);
+        }
+
+        // --- 3. Recherche et Affichage ---
         async function searchData() {
-            const varId = document.getElementById("filter-var").value;
+            const select = document.getElementById("filter-var");
+            const selectedOptions = Array.from(select.selectedOptions).map(opt => opt.value);
+
+            if (selectedOptions.length === 0) {
+                showWarning("Veuillez sélectionner au moins une variable.");
+                return;
+            }
+
+            const varIds = selectedOptions.join(',');
             const start = document.getElementById("filter-start").value;
             const end = document.getElementById("filter-end").value;
 
-            const query = new URLSearchParams({ variable_id: varId, start, end });
+            const query = new URLSearchParams({ variable_id: varIds, start, end });
 
             try {
                 const res = await fetch(`${API_URL}/history?${query}`);
-                currentData = await res.json();
+                const data = await res.json();
 
-                document.getElementById("res-count").textContent = currentData.length;
-                const tbody = document.getElementById("history-body");
-                tbody.innerHTML = "";
+                updateTable(data);
+                updateChart(data, selectedOptions);
 
-                if (currentData.length === 0) {
-                    tbody.innerHTML = "<tr><td colspan='3' class='empty-message'>Aucune donnée trouvée</td></tr>";
-                    return;
-                }
-
-                currentData.forEach(d => {
-                    const tr = document.createElement("tr");
-                    const dateFmt = new Date(d.timestamp).toLocaleString();
-                    tr.innerHTML = `
-                    <td>${dateFmt}</td>
-                    <td>${d.Variable ? d.Variable.nom : 'Inconnue'}</td>
-                    <td><strong>${d.valeur}</strong></td>
-                `;
-                    tbody.appendChild(tr);
-                });
             } catch (e) { console.error(e); }
         }
 
-        // 3. Exporter en CSV (Via Backend)
+        function updateTable(data) {
+            document.getElementById("res-count").textContent = data.length;
+            const tbody = document.getElementById("history-body");
+            tbody.innerHTML = "";
+
+            if (data.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='3' class='empty-message'>Aucune donnée sur cette période</td></tr>";
+                return;
+            }
+
+            // Afficher les 100 dernières mesures max dans le tableau pour ne pas surcharger
+            const displayData = data.slice().reverse().slice(0, 100);
+
+            displayData.forEach(d => {
+                const tr = document.createElement("tr");
+                const dateFmt = new Date(d.timestamp).toLocaleString();
+                const varName = d.Variable ? d.Variable.nom : 'Inconnue';
+                tr.innerHTML = `<td>${dateFmt}</td><td>${varName}</td><td><strong>${d.valeur}</strong></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateChart(data, selectedVarIds) {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            if (data.length === 0) return;
+
+            // Grouper les données par variable
+            const datasets = [];
+            const colors = ['#11c5ff', '#2ecc71', '#f39c12', '#9b59b6', '#e74c3c'];
+
+            selectedVarIds.forEach((varId, index) => {
+                const variable = variablesList.find(v => v.id == varId);
+                const varData = data.filter(d => d.variable_id == varId);
+
+                if (varData.length === 0) return;
+
+                const color = colors[index % colors.length];
+
+                const dataset = {
+                    label: variable.nom,
+                    data: varData.map(d => ({ x: new Date(d.timestamp), y: d.valeur })),
+                    borderColor: color,
+                    backgroundColor: color + '20', // Opacité
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    fill: false,
+                    tension: 0.1
+                };
+
+                // Spécifique TOR
+                if (variable.type === 'boolean') {
+                    dataset.stepped = true;
+                }
+
+                datasets.push(dataset);
+            });
+
+            // --- RESTAURATION DES SEUILS (ALERTE) ---
+            // Uniquement si une seule variable est sélectionnée pour éviter la confusion
+            if (selectedVarIds.length === 1) {
+                const variable = variablesList.find(v => v.id == selectedVarIds[0]);
+                if (variable && variable.type === 'float') {
+                    if (variable.seuil_max) {
+                        datasets.push({
+                            label: 'Seuil Max',
+                            data: new Array(data.length).fill(variable.seuil_max),
+                            borderColor: '#ff4b4b',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+                    if (variable.seuil_min) {
+                        datasets.push({
+                            label: 'Seuil Min',
+                            data: new Array(data.length).fill(variable.seuil_min),
+                            borderColor: '#f39c12',
+                            borderWidth: 1,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        });
+                    }
+                }
+            }
+
+            // Configuration de base
+            let config = {
+                type: 'line',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'minute',
+                                displayFormats: { minute: 'HH:mm' }
+                            },
+                            grid: { color: '#1c2844' },
+                            ticks: { color: '#9aa7c7' }
+                        },
+                        y: {
+                            grid: { color: '#1c2844' },
+                            ticks: { color: '#9aa7c7' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e5ecff' } }
+                    }
+                }
+            };
+
+            currentChart = new Chart(ctx, config);
+        }
+
+        // --- 4. Export CSV ---
         function exportCSV() {
-            const varId = document.getElementById("filter-var").value;
+            const select = document.getElementById("filter-var");
+            const selectedOptions = Array.from(select.selectedOptions).map(opt => opt.value);
+
+            if (selectedOptions.length === 0) {
+                showWarning("Veuillez sélectionner au moins une variable.");
+                return;
+            }
+
+            const varIds = selectedOptions.join(',');
             const start = document.getElementById("filter-start").value;
             const end = document.getElementById("filter-end").value;
 
-            const query = new URLSearchParams({ variable_id: varId, start, end });
-
-            // Déclenche le téléchargement direct via le navigateur
+            const query = new URLSearchParams({ variable_id: varIds, start, end });
             window.location.href = `${API_URL}/export?${query}`;
-        }
-
-        function logout() {
-            localStorage.removeItem("loggedIn");
-            window.location.href = "login.html";
         }
 
         // Horloge
