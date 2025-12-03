@@ -113,7 +113,7 @@ Tu peux :
 ## 👨‍💻 Contributeurs
 
 - **Valentin G.**
-- **Axel M.** (à ajouter)
+- **Axel M.** 
 
 ---
 
