@@ -5,13 +5,10 @@ services:
     build: ./backend
     ports:
       - "3000:3000"
-    environment:
-      - DB_HOST=database
-      - DB_USER=root
-      - DB_PASSWORD=admin
-      - DB_NAME=supervision
+    env_file: .env
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     networks:
       - supervision-network
 
@@ -26,13 +23,16 @@ services:
 
   database:
     image: mariadb:latest
-    environment:
-      - MARIADB_ROOT_PASSWORD=admin
-      - MARIADB_DATABASE=supervision
+    env_file: .env
     volumes:
       - db_data:/var/lib/mysql
     ports:
       - "3307:3306"
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - supervision-network
 

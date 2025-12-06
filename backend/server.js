@@ -65,6 +65,7 @@ app.post("/api/mode", (req, res) => {
         res.status(400).json({ error: "Valeur booléenne attendue" });
     }
 });
+
 app.get("/api/mode", (req, res) => {
     res.json({ mode: getSimulationMode() });
 });
